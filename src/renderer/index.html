@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'">
+  <title>OptiGSM — GSM Repair Suite</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="brand-icon">⚡</span>
+      <span class="brand-name">OptiGSM</span>
+      <span class="brand-version">v1.0.0</span>
+    </div>
+    <div class="topbar-device" id="deviceStatus">
+      <span class="dot dot-off" id="connDot"></span>
+      <span id="connLabel">Sin dispositivo</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-icon" id="btnRefresh" title="Escanear dispositivos">↻</button>
+      <button class="btn-icon" id="btnSettings" title="Ajustes">⚙</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="nav-section">
+        <div class="nav-label">DISPOSITIVO</div>
+        <button class="nav-item active" data-tab="home">🏠 Inicio</button>
+        <button class="nav-item" data-tab="info">📱 Info</button>
+        <button class="nav-item" data-tab="apps">📦 Aplicaciones</button>
+        <button class="nav-item" data-tab="reboot">🔄 Reinicio</button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">PLATAFORMAS</div>
+        <button class="nav-item" data-tab="mtk">🔵 MTK / Preloader</button>
+        <button class="nav-item" data-tab="qc">🟣 Qualcomm / EDL</button>
+        <button class="nav-item" data-tab="samsung">🔶 Samsung / Odin</button>
+        <button class="nav-item" data-tab="other">⚪ Huawei / Unisoc</button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">REPARACIÓN</div>
+        <button class="nav-item" data-tab="frp">🔓 FRP Bypass</button>
+        <button class="nav-item" data-tab="firmware">💾 Firmware</button>
+        <button class="nav-item" data-tab="flash">⚡ Flash</button>
+        <button class="nav-item" data-tab="fastboot">🚀 Fastboot</button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">SISTEMA</div>
+        <button class="nav-item" data-tab="advanced" id="navAdvanced">🔒 Avanzado</button>
+        <button class="nav-item" data-tab="history">📋 Historial</button>
+        <button class="nav-item" data-tab="settings">⚙️ Ajustes</button>
+      </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main-content">
+      <!-- INICIO -->
+      <div class="tab-panel active" id="tab-home">
+        <h2 class="panel-title">Panel principal</h2>
+        <div class="device-cards" id="deviceCards">
+          <div class="empty-state">
+            <div class="empty-icon">📱</div>
+            <div>Conecta un dispositivo Android por USB</div>
+            <div class="empty-hint">ADB debe estar habilitado en el dispositivo</div>
+            <button class="btn btn-primary" id="btnScan">Escanear</button>
+          </div>
+        </div>
+        <div class="info-grid" id="homeInfo" style="display:none">
+          <div class="info-card">
+            <div class="info-card-title">Modelo</div>
+            <div class="info-card-val" id="hModel">—</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-title">Android</div>
+            <div class="info-card-val" id="hAndroid">—</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-title">IMEI 1</div>
+            <div class="info-card-val" id="hImei1">—</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-title">IMEI 2</div>
+            <div class="info-card-val" id="hImei2">—</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-title">Batería</div>
+            <div class="info-card-val" id="hBattery">—</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-title">Serial</div>
+            <div class="info-card-val" id="hSerial">—</div>
+          </div>
+        </div>
+        <div class="quick-actions" id="quickActions" style="display:none">
+          <h3>Acciones rápidas</h3>
+          <div class="action-grid">
+            <button class="action-btn" id="qaScreenshot">📸 Captura</button>
+            <button class="action-btn" id="qaReboot">🔄 Reiniciar</button>
+            <button class="action-btn" id="qaWifi">📡 ADB WiFi</button>
+            <button class="action-btn" id="qaBackup">💾 Backup</button>
+            <button class="action-btn" id="qaLogcat">📝 Logcat</button>
+            <button class="action-btn" id="qaStorage">💿 Almacenamiento</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- INFO -->
+      <div class="tab-panel" id="tab-info">
+        <h2 class="panel-title">Información del dispositivo</h2>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnGetInfo">Leer información</button>
+          <button class="btn" id="btnBattery">Batería</button>
+          <button class="btn" id="btnStorageInfo">Almacenamiento</button>
+        </div>
+        <div class="info-table" id="infoTable"></div>
+      </div>
+
+      <!-- APPS -->
+      <div class="tab-panel" id="tab-apps">
+        <h2 class="panel-title">Gestión de aplicaciones</h2>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnListApps">Listar apps</button>
+          <button class="btn" id="btnListSystem">Apps sistema</button>
+          <button class="btn btn-success" id="btnInstallApk">Instalar APK</button>
+        </div>
+        <div class="search-row">
+          <input class="input" id="appSearch" placeholder="Buscar paquete...">
+        </div>
+        <div class="app-list" id="appList"></div>
+      </div>
+
+      <!-- REBOOT -->
+      <div class="tab-panel" id="tab-reboot">
+        <h2 class="panel-title">Reinicio del dispositivo</h2>
+        <div class="action-grid lg">
+          <button class="action-btn" id="rbNormal">📱 Normal</button>
+          <button class="action-btn" id="rbRecovery">🛠️ Recovery</button>
+          <button class="action-btn" id="rbBootloader">🔵 Bootloader</button>
+          <button class="action-btn" id="rbFastboot">🚀 Fastboot</button>
+          <button class="action-btn" id="rbDownload">⬇️ Download Mode</button>
+          <button class="action-btn" id="rbEdl">🟣 EDL / 9008</button>
+        </div>
+      </div>
+
+      <!-- MTK -->
+      <div class="tab-panel" id="tab-mtk">
+        <h2 class="panel-title">MediaTek — BROM / Preloader</h2>
+        <div class="alert alert-info">⚠️ Conecta el dispositivo <strong>apagado</strong> con Vol- presionado para entrar en modo BROM.</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="mtkCheck">Verificar mtkclient</button>
+          <button class="btn" id="mtkPrintGpt">Tabla particiones</button>
+          <button class="btn" id="mtkInfo">Leer info</button>
+        </div>
+        <div class="op-grid">
+          <div class="op-card">
+            <h4>Lectura de partición</h4>
+            <input class="input" id="mtkRpName" placeholder="Nombre (ej: boot, nvram)">
+            <button class="btn btn-primary" id="mtkRpRun">Leer → Archivo</button>
+          </div>
+          <div class="op-card">
+            <h4>Escritura de partición</h4>
+            <input class="input" id="mtkWpName" placeholder="Nombre de partición">
+            <button class="btn btn-warning" id="mtkWpFile">Seleccionar imagen...</button>
+            <button class="btn btn-danger" id="mtkWpRun">Escribir ⚠️</button>
+          </div>
+          <div class="op-card">
+            <h4>Flash completo</h4>
+            <button class="btn" id="mtkReadFlash">Leer flash completo</button>
+            <button class="btn btn-danger" id="mtkWriteFlash">Escribir flash ⚠️</button>
+          </div>
+          <div class="op-card">
+            <h4>FRP / Datos</h4>
+            <button class="btn btn-warning" id="mtkFrp">Reset FRP</button>
+            <button class="btn btn-danger" id="mtkWipe">Wipe datos ⚠️</button>
+            <button class="btn" id="mtkUnlock">Desbloquear BL</button>
+          </div>
+          <div class="op-card">
+            <h4>Scatter Flash</h4>
+            <button class="btn" id="mtkScatterFile">Seleccionar scatter...</button>
+            <button class="btn btn-primary" id="mtkScatterFlash">Flash por scatter</button>
+          </div>
+          <div class="op-card">
+            <h4>NVRAM</h4>
+            <button class="btn" id="mtkReadNvram">Leer NVRAM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- QC -->
+      <div class="tab-panel" id="tab-qc">
+        <h2 class="panel-title">Qualcomm — EDL / 9008</h2>
+        <div class="alert alert-info">⚠️ Conecta el dispositivo en modo EDL (combinación Vol+ Vol- o test point).</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="qcCheck">Verificar edl</button>
+          <button class="btn" id="qcPrintGpt">Tabla particiones</button>
+        </div>
+        <div class="op-grid">
+          <div class="op-card">
+            <h4>Lectura de partición</h4>
+            <input class="input" id="qcRpName" placeholder="Nombre (ej: boot, modemst1)">
+            <button class="btn btn-primary" id="qcRpRun">Leer → Archivo</button>
+          </div>
+          <div class="op-card">
+            <h4>Escritura de partición</h4>
+            <input class="input" id="qcWpName" placeholder="Nombre de partición">
+            <button class="btn btn-warning" id="qcWpFile">Seleccionar imagen...</button>
+            <button class="btn btn-danger" id="qcWpRun">Escribir ⚠️</button>
+          </div>
+          <div class="op-card">
+            <h4>EFS (IMEI)</h4>
+            <button class="btn" id="qcReadEfs">Leer EFS (backup)</button>
+            <button class="btn btn-danger" id="qcWriteEfs">Restaurar EFS ⚠️</button>
+            <button class="btn" id="qcBackup">Backup crítico</button>
+          </div>
+          <div class="op-card">
+            <h4>FRP / Datos</h4>
+            <button class="btn btn-warning" id="qcFrp">Reset FRP</button>
+            <button class="btn btn-danger" id="qcWipe">Wipe datos ⚠️</button>
+          </div>
+          <div class="op-card">
+            <h4>Programmer (Firehose)</h4>
+            <button class="btn" id="qcLoadProg">Cargar programmer...</button>
+            <div class="hint">Necesario para algunos chipsets sin autodetección</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAMSUNG -->
+      <div class="tab-panel" id="tab-samsung">
+        <h2 class="panel-title">Samsung — Download Mode / Heimdall</h2>
+        <div class="alert alert-info">⚠️ Conecta en Download Mode (Vol- + Home + Power o Vol- + Vol+ + Power en modelos nuevos).</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="samCheck">Verificar Heimdall</button>
+          <button class="btn" id="samDetect">Detectar dispositivo</button>
+          <button class="btn" id="samPit">Leer PIT</button>
+        </div>
+        <div class="op-grid">
+          <div class="op-card">
+            <h4>Flash de firmware (AP+BL+CP+CSC)</h4>
+            <div class="fw-files">
+              <label>BL: <button class="btn btn-sm" id="samFwBl">Seleccionar BL...</button></label>
+              <label>AP: <button class="btn btn-sm" id="samFwAp">Seleccionar AP...</button></label>
+              <label>CP: <button class="btn btn-sm" id="samFwCp">Seleccionar CP...</button></label>
+              <label>CSC: <button class="btn btn-sm" id="samFwCsc">Seleccionar CSC...</button></label>
+            </div>
+            <button class="btn btn-danger" id="samFlashFw">Flash completo ⚠️</button>
+          </div>
+          <div class="op-card">
+            <h4>Partición individual</h4>
+            <input class="input" id="samPartName" placeholder="Partición (BOOT, RECOVERY...)">
+            <button class="btn" id="samPartFile">Seleccionar imagen...</button>
+            <button class="btn btn-danger" id="samPartFlash">Flash partición ⚠️</button>
+          </div>
+          <div class="op-card">
+            <h4>FRP / Info</h4>
+            <button class="btn btn-warning" id="samFrp">Reset FRP (ADB)</button>
+            <button class="btn" id="samInfo">Info dispositivo</button>
+            <button class="btn" id="samDownloadMode">→ Download Mode</button>
+          </div>
+          <div class="op-card">
+            <h4>Buscar firmware</h4>
+            <input class="input" id="samFwModel" placeholder="Modelo (ej: SM-A546B)">
+            <select class="select" id="samFwRegion">
+              <option value="PHE">ES (PHE)</option>
+              <option value="BTU">UK (BTU)</option>
+              <option value="DBT">DE (DBT)</option>
+              <option value="XEF">FR (XEF)</option>
+              <option value="EUX">EU (EUX)</option>
+              <option value="TMB">US (TMB)</option>
+              <option value="INS">IN (INS)</option>
+            </select>
+            <button class="btn btn-primary" id="samSearchFw">Buscar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- OTHER (Huawei/Unisoc) -->
+      <div class="tab-panel" id="tab-other">
+        <h2 class="panel-title">Huawei / Honor / Unisoc</h2>
+        <div class="tabs-sub">
+          <button class="tab-sub active" data-sub="huawei">Huawei</button>
+          <button class="tab-sub" data-sub="unisoc">Unisoc / SPD</button>
+        </div>
+        <div class="sub-panel active" id="sub-huawei">
+          <div class="btn-row">
+            <button class="btn btn-primary" id="hwInfo">Info dispositivo</button>
+            <button class="btn" id="hwDev">Activar opciones dev</button>
+          </div>
+          <div class="op-grid">
+            <div class="op-card">
+              <h4>FRP Bypass</h4>
+              <button class="btn btn-warning" id="hwFrp">Bypass FRP (ADB)</button>
+            </div>
+            <div class="op-card">
+              <h4>Backup NVM</h4>
+              <button class="btn" id="hwNvm">Leer NVM / IMEI backup</button>
+            </div>
+            <div class="op-card">
+              <h4>Bootloader</h4>
+              <input class="input" id="hwUnlockCode" placeholder="Código de desbloqueo (si tienes)">
+              <button class="btn btn-warning" id="hwUnlock">Desbloquear BL</button>
+            </div>
+          </div>
+        </div>
+        <div class="sub-panel" id="sub-unisoc">
+          <div class="btn-row">
+            <button class="btn btn-primary" id="spdCheck">Verificar herramienta SPD</button>
+            <button class="btn" id="spdInfo">Info dispositivo</button>
+          </div>
+          <div class="op-grid">
+            <div class="op-card">
+              <h4>Flash</h4>
+              <button class="btn" id="spdReadFlash">Leer flash</button>
+              <button class="btn btn-danger" id="spdWriteFlash">Escribir flash ⚠️</button>
+            </div>
+            <div class="op-card">
+              <h4>FRP / Wipe</h4>
+              <button class="btn btn-warning" id="spdFrp">Reset FRP</button>
+              <button class="btn btn-danger" id="spdWipe">Wipe datos ⚠️</button>
+            </div>
+            <div class="op-card">
+              <h4>Instrucciones</h4>
+              <button class="btn" id="spdInstructions">Ver guía SPD Flash Tool</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FRP -->
+      <div class="tab-panel" id="tab-frp">
+        <h2 class="panel-title">FRP Bypass</h2>
+        <div class="btn-row">
+          <button class="btn" id="frpCheck">Verificar estado FRP</button>
+          <button class="btn btn-success" id="frpEnable">Re-activar Google (deshacer)</button>
+        </div>
+        <div class="frp-methods" id="frpMethods"></div>
+      </div>
+
+      <!-- FIRMWARE -->
+      <div class="tab-panel" id="tab-firmware">
+        <h2 class="panel-title">Firmware</h2>
+        <div class="fw-search">
+          <select class="select" id="fwBrand">
+            <option value="samsung">Samsung</option>
+            <option value="xiaomi">Xiaomi / Redmi</option>
+            <option value="oppo">OPPO</option>
+            <option value="oneplus">OnePlus</option>
+            <option value="realme">Realme</option>
+            <option value="motorola">Motorola</option>
+            <option value="huawei">Huawei</option>
+            <option value="pixel">Google Pixel</option>
+          </select>
+          <input class="input" id="fwModel" placeholder="Modelo (ej: SM-A546B, Redmi Note 12)">
+          <input class="input" id="fwRegion" placeholder="Región (ej: EEA, Global)">
+          <button class="btn btn-primary" id="fwSearch">Buscar firmware</button>
+        </div>
+        <div class="fw-result" id="fwResult"></div>
+        <div class="fw-actions" id="fwActions" style="display:none">
+          <input class="input" id="fwUrl" placeholder="URL directa de descarga (si disponible)">
+          <button class="btn btn-primary" id="fwDownload">⬇ Descargar</button>
+          <button class="btn" id="fwExtract">📦 Extraer ZIP</button>
+          <button class="btn" id="fwVerify">🔍 Verificar MD5</button>
+        </div>
+      </div>
+
+      <!-- FLASH -->
+      <div class="tab-panel" id="tab-flash">
+        <h2 class="panel-title">Flash de particiones (ADB Sideload)</h2>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="flashSideload">ADB Sideload (Recovery)</button>
+          <button class="btn" id="flashBootImg">Boot image (Fastboot)</button>
+        </div>
+        <div class="op-grid">
+          <div class="op-card">
+            <h4>Instalar OTA / Recovery ZIP</h4>
+            <div class="hint">El dispositivo debe estar en Recovery con ADB habilitado</div>
+            <button class="btn" id="sideloadFile">Seleccionar ZIP...</button>
+            <button class="btn btn-primary" id="sideloadRun">Iniciar sideload</button>
+          </div>
+          <div class="op-card">
+            <h4>Boot image (prueba)</h4>
+            <div class="hint">Arranca una imagen sin flashearla permanentemente</div>
+            <button class="btn" id="bootImgFile">Seleccionar boot.img...</button>
+            <button class="btn btn-primary" id="bootImgRun">Boot temporal</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FASTBOOT -->
+      <div class="tab-panel" id="tab-fastboot">
+        <h2 class="panel-title">Fastboot</h2>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="fbScan">Escanear dispositivos</button>
+          <button class="btn" id="fbInfo">Leer variables</button>
+        </div>
+        <div id="fbDeviceInfo" class="info-table"></div>
+        <div class="op-grid">
+          <div class="op-card">
+            <h4>Flash de partición</h4>
+            <input class="input" id="fbPartName" placeholder="Partición (boot, recovery, system...)">
+            <button class="btn" id="fbPartFile">Seleccionar imagen...</button>
+            <button class="btn btn-danger" id="fbPartFlash">Flash ⚠️</button>
+          </div>
+          <div class="op-card">
+            <h4>Borrar partición</h4>
+            <input class="input" id="fbEraseName" placeholder="Partición a borrar">
+            <button class="btn btn-danger" id="fbErase">Borrar ⚠️</button>
+          </div>
+          <div class="op-card">
+            <h4>Bootloader</h4>
+            <button class="btn btn-warning" id="fbUnlock">OEM Unlock</button>
+            <button class="btn" id="fbLock">OEM Lock</button>
+            <button class="btn btn-danger" id="fbWipe">Wipe (-w) ⚠️</button>
+          </div>
+          <div class="op-card">
+            <h4>Reinicio</h4>
+            <button class="btn" id="fbRebootNorm">Normal</button>
+            <button class="btn" id="fbRebootBootl">Bootloader</button>
+            <button class="btn" id="fbRebootRec">Recovery</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADVANCED -->
+      <div class="tab-panel" id="tab-advanced">
+        <h2 class="panel-title">Modo Avanzado</h2>
+        <div class="adv-gate" id="advGate">
+          <div class="gate-icon">🔒</div>
+          <div class="gate-text">El modo avanzado está <strong>desactivado</strong>.</div>
+          <div class="gate-hint">Actívalo en Ajustes si necesitas: reparación de IMEI, Mi Account, códigos de desbloqueo.</div>
+          <button class="btn btn-primary" id="advGoSettings">Ir a Ajustes</button>
+        </div>
+        <div class="adv-content" id="advContent" style="display:none">
+          <div class="alert alert-warning">⚠️ Funciones avanzadas activas. Úsalas solo con dispositivos de tu propiedad o con autorización explícita.</div>
+          <div class="op-grid">
+            <div class="op-card">
+              <h4>Reparación IMEI — MTK (NVRAM)</h4>
+              <input class="input" id="advMtkImei1" placeholder="IMEI 1 (15 dígitos)">
+              <input class="input" id="advMtkImei2" placeholder="IMEI 2 (opcional)">
+              <button class="btn btn-danger" id="advMtkImeiRun">Escribir IMEI MTK ⚠️</button>
+            </div>
+            <div class="op-card">
+              <h4>Reparación IMEI — QC (EFS)</h4>
+              <input class="input" id="advQcImei1" placeholder="IMEI 1 (15 dígitos)">
+              <input class="input" id="advQcImei2" placeholder="IMEI 2 (opcional)">
+              <button class="btn btn-danger" id="advQcImeiRun">Backup EFS + Instrucciones ⚠️</button>
+            </div>
+            <div class="op-card">
+              <h4>Mi Account Remove (Xiaomi)</h4>
+              <div class="hint">Requiere ADB habilitado o modo recovery.</div>
+              <button class="btn btn-warning" id="advMiAccount">Eliminar Mi Account</button>
+            </div>
+            <div class="op-card">
+              <h4>Huawei ID Remove</h4>
+              <button class="btn btn-warning" id="advHuaweiId">Eliminar Huawei ID</button>
+            </div>
+            <div class="op-card">
+              <h4>Network Unlock</h4>
+              <input class="input" id="advNckImei" placeholder="IMEI (15 dígitos)">
+              <select class="select" id="advNckAlgo">
+                <option value="nck_std">NCK estándar (QC antiguo)</option>
+                <option value="samsung_net">Samsung (instrucciones)</option>
+              </select>
+              <button class="btn btn-primary" id="advNckGen">Generar código</button>
+            </div>
+            <div class="op-card">
+              <h4>FRP Avanzado</h4>
+              <button class="btn btn-warning" id="advMtkFrp">MTK FRP (BROM)</button>
+              <button class="btn btn-warning" id="advQcFrp">QC FRP (EDL)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTORY -->
+      <div class="tab-panel" id="tab-history">
+        <h2 class="panel-title">Historial de operaciones</h2>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="histRefresh">Actualizar</button>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="tab-panel" id="tab-settings">
+        <h2 class="panel-title">Ajustes</h2>
+        <div class="settings-group">
+          <h3>Rutas de herramientas</h3>
+          <label class="setting-row">
+            <span>ADB path</span>
+            <input class="input" id="setAdbPath" placeholder="Dejar vacío = usar PATH">
+            <button class="btn btn-sm" id="setAdbBrowse">...</button>
+          </label>
+          <label class="setting-row">
+            <span>Python path</span>
+            <input class="input" id="setPythonPath" placeholder="Dejar vacío = usar PATH">
+            <button class="btn btn-sm" id="setPyBrowse">...</button>
+          </label>
+        </div>
+        <div class="settings-group">
+          <h3>Opciones</h3>
+          <label class="setting-row">
+            <span>Auto-detectar dispositivos</span>
+            <input type="checkbox" id="setAutoDetect" class="toggle">
+          </label>
+          <label class="setting-row danger">
+            <span>🔒 Modo Avanzado</span>
+            <input type="checkbox" id="setAdvancedMode" class="toggle">
+            <span class="hint">Habilita reparación IMEI, account bypass, unlock codes</span>
+          </label>
+        </div>
+        <div class="settings-group">
+          <h3>Dependencias</h3>
+          <div class="dep-list" id="depList">
+            <div class="dep-item"><span>ADB</span><span class="dep-status" id="depAdb">—</span></div>
+            <div class="dep-item"><span>Fastboot</span><span class="dep-status" id="depFastboot">—</span></div>
+            <div class="dep-item"><span>mtkclient</span><span class="dep-status" id="depMtk">—</span></div>
+            <div class="dep-item"><span>edl (QC)</span><span class="dep-status" id="depEdl">—</span></div>
+            <div class="dep-item"><span>Heimdall</span><span class="dep-status" id="depHeimdall">—</span></div>
+          </div>
+          <button class="btn" id="depCheck">Verificar dependencias</button>
+          <div class="hint">Instala con: pip install mtkclient edlclient | scoop install heimdall adb</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="saveSettings">Guardar ajustes</button>
+        </div>
+      </div>
+
+      <!-- Terminal -->
+      <div class="terminal-panel" id="terminalPanel">
+        <div class="term-header">
+          <span>Terminal</span>
+          <div class="term-actions">
+            <button class="btn-icon" id="termClear" title="Limpiar">✕</button>
+            <button class="btn-icon" id="termToggle" title="Ocultar/mostrar">▼</button>
+          </div>
+        </div>
+        <div class="term-body" id="termBody"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Screenshot modal -->
+  <div class="modal" id="ssModal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>Captura de pantalla</span>
+        <button class="btn-icon" id="ssClose">✕</button>
+      </div>
+      <img id="ssImg" src="" alt="Screenshot" class="ss-img">
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

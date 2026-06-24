@@ -1,0 +1,33 @@
+{
+  "name": "optigsm",
+  "version": "1.0.0",
+  "description": "OptiGSM — Herramienta profesional de servicio técnico móvil (OptiSuite)",
+  "main": "src/main/main.js",
+  "author": "Enmanuel Gil <enmanuelgil@github.com>",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "dependencies": {
+    "sql.js": "^1.12.0",
+    "node-fetch": "^2.7.0",
+    "extract-zip": "^2.0.1",
+    "progress-stream": "^2.0.0"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "app.optisuite.optigsm",
+    "productName": "OptiGSM",
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] }]
+    },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "files": ["src/**/*", "assets/**/*", "python/**/*", "tools/**/*"],
+    "extraResources": [{ "from": "tools", "to": "tools" }, { "from": "python", "to": "python" }]
+  }
+}
