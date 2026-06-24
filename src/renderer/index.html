@@ -17,6 +17,7 @@
     <div class="topbar-device" id="deviceStatus">
       <span class="dot dot-off" id="connDot"></span>
       <span id="connLabel">Sin dispositivo</span>
+      <span class="conn-extra" id="connStatus"></span>
     </div>
     <div class="topbar-actions">
       <button class="btn-icon" id="btnRefresh" title="Escanear dispositivos">↻</button>
@@ -53,6 +54,7 @@
         <button class="nav-item" data-tab="advanced" id="navAdvanced">🔒 Avanzado</button>
         <button class="nav-item" data-tab="history">📋 Historial</button>
         <button class="nav-item" data-tab="settings">⚙️ Ajustes</button>
+        <button class="nav-item" data-tab="support">❓ Apoyo</button>
       </div>
     </nav>
 
@@ -113,8 +115,9 @@
         <h2 class="panel-title">Información del dispositivo</h2>
         <div class="btn-row">
           <button class="btn btn-primary" id="btnGetInfo">Leer información</button>
-          <button class="btn" id="btnBattery">Batería</button>
-          <button class="btn" id="btnStorageInfo">Almacenamiento</button>
+          <button class="btn" id="btnBattery">🔋 Batería</button>
+          <button class="btn" id="btnStorageInfo">💾 Almacenamiento</button>
+          <button class="btn" id="btnReadImei">🔢 Leer IMEI</button>
         </div>
         <div class="info-table" id="infoTable"></div>
       </div>
@@ -527,6 +530,71 @@
         </div>
         <div class="btn-row">
           <button class="btn btn-primary" id="saveSettings">Guardar ajustes</button>
+        </div>
+      </div>
+
+      <!-- APOYO -->
+      <div class="tab-panel" id="tab-support">
+        <h2 class="panel-title">❓ Apoyo y Referencia</h2>
+        <div id="supportDeviceInfo" style="margin-bottom:12px"></div>
+        <div class="op-grid">
+          <div class="op-card">
+            <h4>Instalar dependencias</h4>
+            <div class="hint" style="line-height:1.9">
+              <code>pip install mtkclient edlclient pyserial pyusb</code><br>
+              <code>scoop install adb heimdall</code> (Windows)<br>
+              <code>choco install adb heimdall-flash</code> (alternativa)<br>
+              <code>winget install Google.PlatformTools</code> (ADB oficial)
+            </div>
+          </div>
+          <div class="op-card">
+            <h4>Activar ADB en el teléfono</h4>
+            <ol class="hint" style="line-height:1.9;padding-left:16px">
+              <li>Ajustes → Acerca del teléfono → Número de compilación (pulsa 7 veces)</li>
+              <li>Ajustes → Opciones de desarrollador → Depuración USB: ON</li>
+              <li>Conecta el cable y acepta el aviso de depuración en el móvil</li>
+            </ol>
+          </div>
+          <div class="op-card">
+            <h4>Modos especiales</h4>
+            <div class="hint" style="line-height:1.9">
+              <strong>MTK BROM:</strong> Apaga → Vol- + conectar USB<br>
+              <strong>Samsung Download:</strong> Vol- + Home + Power (o Vol-+Vol+ en S10+)<br>
+              <strong>Qualcomm EDL:</strong> Vol+ + Vol- al conectar (o test point)<br>
+              <strong>Fastboot:</strong> Vol- + Power (varía por modelo)<br>
+              <strong>Recovery:</strong> Vol+ + Power (Samsung), Vol- + Power (Pixel)
+            </div>
+          </div>
+          <div class="op-card">
+            <h4>IMEI en Android 10+</h4>
+            <div class="hint" style="line-height:1.9">
+              Desde Android 10, ADB no puede leer el IMEI sin privilegios de sistema.<br>
+              <strong>Opciones:</strong><br>
+              • Root: activa root y usa <em>Modo Avanzado → IMEI</em><br>
+              • MTK: usa <em>MTK/Preloader → Leer NVRAM</em> (sin root)<br>
+              • QC: usa <em>Qualcomm → Leer EFS</em> (modo EDL)<br>
+              • Samsung: se puede leer con Heimdall en Download Mode
+            </div>
+          </div>
+          <div class="op-card">
+            <h4>Heimdall no detectado</h4>
+            <div class="hint" style="line-height:1.9">
+              Heimdall es una herramienta open-source para Samsung.<br>
+              <strong>Instalar:</strong> <code>scoop install heimdall</code><br>
+              O descarga el binario en <em>heimdall.wiki.kernel.org</em> y agrégalo al PATH.<br>
+              Luego en Ajustes → verifica dependencias.
+            </div>
+          </div>
+          <div class="op-card">
+            <h4>Acerca de OptiGSM</h4>
+            <div class="hint" style="line-height:1.9">
+              <strong>Versión:</strong> 1.0.0<br>
+              <strong>Marca:</strong> OptiSuite<br>
+              <strong>Uso:</strong> Herramienta de reparación GSM profesional<br>
+              <strong>Plataformas:</strong> ADB · MTK · Qualcomm · Samsung · Huawei · Unisoc<br>
+              <strong>Nota:</strong> Código privado. Uso personal y profesional autorizado.
+            </div>
+          </div>
         </div>
       </div>
 

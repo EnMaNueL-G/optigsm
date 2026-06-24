@@ -102,14 +102,18 @@ ipcMain.handle('adb:uninstall', async (_, serial, pkg, keepData) => adb.adbUnins
 ipcMain.handle('adb:packages', async (_, serial, flags) => adb.adbListPackages(serial, flags));
 ipcMain.handle('adb:disable', async (_, serial, pkg) => adb.adbDisablePackage(serial, pkg));
 ipcMain.handle('adb:enable', async (_, serial, pkg) => adb.adbEnablePackage(serial, pkg));
+ipcMain.handle('adb:forceStop', async (_, serial, pkg) => adb.adbForceStop(serial, pkg));
+ipcMain.handle('adb:clearData', async (_, serial, pkg) => adb.adbClearData(serial, pkg));
 ipcMain.handle('adb:reboot', async (_, serial, mode) => adb.adbReboot(serial, mode));
 ipcMain.handle('adb:wifi', async (_, serial) => adb.adbWifi(serial));
 ipcMain.handle('adb:wifiConnect', async (_, host) => adb.adbWifiConnect(host));
+ipcMain.handle('adb:readImei', async (_, serial) => adb.readImei(serial));
 ipcMain.handle('adb:battery', async (_, serial) => adb.adbBatteryInfo(serial));
 ipcMain.handle('adb:storage', async (_, serial) => adb.adbStorageInfo(serial));
 ipcMain.handle('adb:wipeData', async (_, serial) => adb.adbWipeData(serial));
 ipcMain.handle('adb:backup', async (_, serial, opts) => {
-  const dest = path.join(app.getPath('desktop'), `backup_${serial}_${Date.now()}.ab`);
+  const dest = path.join(app.getPath('desktop'), `backup_${serial}_${Date.now()}`);
+  fs.mkdirSync(dest, { recursive: true });
   return adb.adbBackup(serial, dest, opts, sendStream);
 });
 ipcMain.handle('adb:screenshot', async (_, serial) => {

@@ -80,6 +80,16 @@ function onTabOpen(tab) {
   if (tab === 'settings') loadSettingsUI();
   if (tab === 'advanced') checkAdvanced();
   if (tab === 'fastboot') fbScan();
+  if (tab === 'support') loadSupportInfo();
+}
+
+function loadSupportInfo() {
+  const el = document.getElementById('supportDeviceInfo');
+  if (!el) return;
+  const s = getSerial();
+  el.innerHTML = s
+    ? `<div class="info-row"><span class="key">Dispositivo activo</span><span class="val">${escHtml(s)}</span></div>`
+    : '<div class="info-row"><span class="key">Dispositivo</span><span class="val">Sin dispositivo conectado</span></div>';
 }
 
 /* ===== DEVICE EVENTS ===== */
@@ -230,50 +240,82 @@ function setupHandlers() {
   };
   document.getElementById('qaWifi').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    term('Activando ADB WiFi...', 'info');
-    const r = await gsm.adb.wifi(s); showResult(r);
+    term('Activando ADB WiFi y conectando...', 'info');
+    const r = await gsm.adb.wifi(s);
+    showResult(r);
+    if (r && r.ok && r.ip) {
+      document.getElementById('connStatus').textContent = `WiFi: ${r.ip}:5555`;
+    }
   };
   document.getElementById('qaBackup').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    term('Iniciando backup...', 'info');
-    const r = await gsm.adb.backup(s, { all: true }); showResult(r);
+    if (!confirm('Se copiarán DCIM, Fotos, Descargas, WhatsApp y Documentos al Escritorio.\n¿Continuar?')) return;
+    term('Iniciando backup de archivos...', 'info');
+    const r = await gsm.adb.backup(s, {}); showResult(r);
   };
   document.getElementById('qaLogcat').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    term('Iniciando logcat (cierra la app para parar)...', 'info');
-    // Just open shell with logcat as a one-shot
-    const r = await gsm.adb.shell(s, 'logcat -d -v brief *:W 2>&1 | head -100');
-    showResult(r);
+    term('Capturando log del sistema (últimas 150 líneas de avisos y errores)...', 'info');
+    const r = await gsm.adb.shell(s, 'logcat -d -v time *:W 2>&1 | tail -150');
+    if (r.out) {
+      r.out.split('\n').filter(l => l.trim()).forEach(l => {
+        const type = l.includes(' E ') ? 'err' : l.includes(' W ') ? 'warn' : 'data';
+        term(l, type);
+      });
+    } else showResult(r);
   };
   document.getElementById('qaStorage').onclick = async () => {
     const s = needDevice(); if (!s) return;
+    term('Leyendo almacenamiento...', 'info');
     const r = await gsm.adb.storage(s); showResult(r);
   };
 
   // Info tab
   document.getElementById('btnGetInfo').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    term('Leyendo información...', 'info');
+    term('Leyendo información del dispositivo...', 'info');
     const info = await gsm.deviceInfo(s);
+    const LABELS = { serial:'Nº Serie', model:'Modelo', brand:'Marca', android:'Android', sdk:'SDK', cpu:'CPU/SoC', product:'Producto', imei1:'IMEI 1', imei2:'IMEI 2', build:'Build', ram:'RAM', storage:'Almacenamiento', battery:'Batería' };
     const table = document.getElementById('infoTable');
-    table.innerHTML = Object.entries(info).map(([k, v]) => `
-      <div class="info-row"><span class="key">${k}</span><span class="val">${v || '—'}</span></div>
-    `).join('');
-    showResult({ ok: true, out: JSON.stringify(info, null, 2) });
+    table.innerHTML = Object.entries(info).map(([k, v]) => {
+      const val = v || '—';
+      const highlight = (k === 'imei1' || k === 'imei2') && val !== '—' ? ' style="color:var(--accent);font-weight:600"' : '';
+      return `<div class="info-row"><span class="key">${LABELS[k]||k}</span><span class="val"${highlight}>${escHtml(String(val))}</span></div>`;
+    }).join('');
+    if (!info.imei1) term('IMEI no accesible por ADB estándar. Activa root o usa Modo Avanzado → IMEI.', 'warn');
+  };
+  document.getElementById('btnReadImei').onclick = async () => {
+    const s = needDevice(); if (!s) return;
+    term('Leyendo IMEI (varios métodos)...', 'info');
+    const r = await gsm.adb.readImei(s);
+    const table = document.getElementById('infoTable');
+    table.innerHTML = `
+      <div class="info-row"><span class="key">IMEI 1</span><span class="val" style="color:var(--accent);font-weight:600">${r.imei1 || '— (requiere root o privilegios)'}</span></div>
+      <div class="info-row"><span class="key">IMEI 2</span><span class="val" style="color:var(--accent);font-weight:600">${r.imei2 || '—'}</span></div>
+    `;
+    term(r.imei1 ? `IMEI 1: ${r.imei1}` + (r.imei2 ? ` | IMEI 2: ${r.imei2}` : '') : 'IMEI no accesible. En Android 10+ requiere privilegios de sistema o root.', r.imei1 ? 'ok' : 'warn');
   };
   document.getElementById('btnBattery').onclick = async () => {
     const s = needDevice(); if (!s) return;
+    term('Leyendo batería detallada...', 'info');
     const r = await gsm.adb.battery(s);
     const table = document.getElementById('infoTable');
-    if (r && typeof r === 'object' && r.level) {
-      table.innerHTML = Object.entries(r).map(([k, v]) => `
-        <div class="info-row"><span class="key">${k}</span><span class="val">${v || '—'}</span></div>
+    if (r && typeof r === 'object') {
+      table.innerHTML = Object.entries(r).filter(([,v])=>v).map(([k, v]) => `
+        <div class="info-row"><span class="key">${k}</span><span class="val">${escHtml(String(v))}</span></div>
       `).join('');
     } else { showResult(r); }
   };
   document.getElementById('btnStorageInfo').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    const r = await gsm.adb.storage(s); showResult(r);
+    term('Leyendo particiones...', 'info');
+    const r = await gsm.adb.storage(s);
+    if (r && r.parsed && r.parsed.length) {
+      const table = document.getElementById('infoTable');
+      table.innerHTML = `<div class="info-row" style="font-weight:600;border-bottom:1px solid var(--border)"><span class="key">Punto montaje</span><span class="val">Tamaño / Usado / Libre</span></div>` +
+        r.parsed.map(p => `<div class="info-row"><span class="key" style="font-size:11px">${escHtml(p.mountpoint||p.filesystem)}</span><span class="val">${p.size} / ${p.used} / ${p.available} (${p.use})</span></div>`).join('');
+    }
+    showResult(r);
   };
 
   // Apps tab
@@ -645,10 +687,12 @@ function renderAppList(pkgs) {
   if (!pkgs.length) { list.innerHTML = '<div class="empty-state" style="padding:20px">Sin resultados</div>'; return; }
   list.innerHTML = pkgs.map(pkg => `
     <div class="app-item">
-      <span class="app-pkg">${pkg}</span>
+      <span class="app-pkg">${escHtml(pkg)}</span>
       <div class="app-actions">
-        <button class="btn btn-sm" data-action="disable" data-pkg="${pkg}">Deshabilitar</button>
-        <button class="btn btn-sm btn-danger" data-action="uninstall" data-pkg="${pkg}">Desinstalar</button>
+        <button class="btn btn-sm btn-xs" data-action="forceStop" data-pkg="${escHtml(pkg)}" title="Forzar cierre">⏹ Cerrar</button>
+        <button class="btn btn-sm btn-xs" data-action="clearData" data-pkg="${escHtml(pkg)}" title="Borrar datos y caché">🗑 Datos</button>
+        <button class="btn btn-sm btn-xs" data-action="disable" data-pkg="${escHtml(pkg)}">Deshabilitar</button>
+        <button class="btn btn-sm btn-danger btn-xs" data-action="uninstall" data-pkg="${escHtml(pkg)}">Desinstalar</button>
       </div>
     </div>
   `).join('');
@@ -656,13 +700,13 @@ function renderAppList(pkgs) {
     btn.onclick = async () => {
       const s = needDevice(); if (!s) return;
       const pkg = btn.dataset.pkg;
-      if (btn.dataset.action === 'disable') {
-        if (!confirm(`¿Deshabilitar ${pkg}?`)) return;
-        showResult(await gsm.adb.disable(s, pkg));
-      } else {
-        if (!confirm(`¿Desinstalar ${pkg}? Se perderán los datos.`)) return;
-        showResult(await gsm.adb.uninstall(s, pkg, false));
-      }
+      const actions = {
+        forceStop: async () => { term(`Cerrando ${pkg}...`, 'info'); showResult(await gsm.adb.forceStop(s, pkg)); },
+        clearData: async () => { if (!confirm(`¿Borrar todos los datos de ${pkg}?`)) return; term(`Borrando datos de ${pkg}...`, 'warn'); showResult(await gsm.adb.clearData(s, pkg)); },
+        disable: async () => { if (!confirm(`¿Deshabilitar ${pkg}?`)) return; showResult(await gsm.adb.disable(s, pkg)); },
+        uninstall: async () => { if (!confirm(`¿Desinstalar ${pkg}? Se perderán los datos.`)) return; showResult(await gsm.adb.uninstall(s, pkg, false)); },
+      };
+      if (actions[btn.dataset.action]) await actions[btn.dataset.action]();
     };
   });
 }
