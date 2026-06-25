@@ -8,11 +8,68 @@ const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
 
-/* ===== SAMSUNG (SamFW) ===== */
+/* ===== SAMSUNG (SamFW + FOTA) ===== */
+function httpsGet(url, timeout = 10000) {
+  return new Promise((resolve) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }, timeout }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        req.destroy();
+        return httpsGet(res.headers.location, timeout).then(resolve);
+      }
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => resolve({ ok: true, status: res.statusCode, data }));
+    });
+    req.on('error', e => resolve({ ok: false, data: '', error: e.message }));
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, data: '', error: 'timeout' }); });
+  });
+}
+
 async function searchSamsungFw(model, region) {
-  // Public SamFW search — returns HTML, parse relevant data
-  const url = `https://samfw.com/firmware/${encodeURIComponent(model)}/${encodeURIComponent(region)}`;
-  return { url, brand: 'Samsung', model, region, note: 'Abre la URL para descargar manualmente o usa Frija/Bifrost para descarga directa.' };
+  const modelUpper = (model || '').toUpperCase().trim();
+  const regionUpper = (region || 'ZTO').toUpperCase().trim();
+  const samfwUrl = `https://samfw.com/firmware/${modelUpper}/${regionUpper}`;
+  const fotaUrl  = `https://fota-cloud-dn.ospserver.net/firmware/${regionUpper}/${modelUpper}/version.xml`;
+
+  // Try Samsung FOTA server (public, no auth needed)
+  const fotaR = await httpsGet(fotaUrl, 8000);
+  let fotaVersion = '';
+  if (fotaR.ok && fotaR.data) {
+    const m = fotaR.data.match(/<latest[^>]*>([^<]+)<\/latest>/i) || fotaR.data.match(/<version[^>]*>([^<]+)<\/version>/i);
+    if (m) fotaVersion = m[1].trim();
+  }
+
+  // Try SamFW HTML scrape for firmware list
+  const samfwR = await httpsGet(samfwUrl, 10000);
+  const firmwares = [];
+  if (samfwR.ok && samfwR.data) {
+    const rowRegex = /<tr[^>]*>[\s\S]*?<\/tr>/gi;
+    const rows = samfwR.data.match(rowRegex) || [];
+    for (const row of rows.slice(0, 8)) {
+      const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || []).map(c => c.replace(/<[^>]+>/g, '').trim());
+      if (cells.length >= 3 && cells[0] && cells[0].match(/[A-Z0-9]{10,}/)) {
+        firmwares.push({ version: cells[0], date: cells[1] || '', os: cells[2] || '', size: cells[3] || '' });
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    brand: 'Samsung',
+    model: modelUpper,
+    region: regionUpper,
+    fotaLatest: fotaVersion || '(no disponible)',
+    firmwares,
+    samfwUrl,
+    tools: [
+      { name: 'Frija (recomendado)', url: 'https://github.com/SlackingVeteran/frija/releases' },
+      { name: 'Bifrost',             url: 'https://github.com/zacharee/SamloaderKotlin/releases' },
+      { name: 'SamFW (web)',         url: samfwUrl },
+    ],
+    note: fotaVersion
+      ? `Firmware más reciente (Samsung FOTA): ${fotaVersion}`
+      : 'Usa Frija o Bifrost para descargar directamente desde los servidores Samsung.',
+  };
 }
 
 /* ===== XIAOMI (MIUI/HyperOS) ===== */

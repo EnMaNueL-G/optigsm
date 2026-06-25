@@ -77,21 +77,36 @@ async function adbProp(serial, prop) {
 }
 
 async function readImei(serial) {
-  // Method 1: service call iphonesubinfo (works ADB Android <10, or root)
-  const parseServiceCall = (out) => out.replace(/[^0-9]/g,'').slice(0,15);
-  const r1 = await adbShell(serial, "service call iphonesubinfo 1 i32 2 2>/dev/null | grep -oP \"'[0-9.]+'\" | tr -d \"'.\" | tr -d ' '").catch(()=>({out:''}));
-  const imei1a = parseServiceCall(r1.out);
-  const r2 = await adbShell(serial, "service call iphonesubinfo 3 i32 2 2>/dev/null | grep -oP \"'[0-9.]+'\" | tr -d \"'.\" | tr -d ' '").catch(()=>({out:''}));
-  const imei2a = parseServiceCall(r2.out);
-  if (imei1a.length === 15) return { imei1: imei1a, imei2: imei2a };
-  // Method 2: getprop (some older Samsung/MTK)
-  const p1 = await adbProp(serial, 'gsm.imei').catch(()=>'');
-  if (p1 && p1.length >= 15) return { imei1: p1.slice(0,15), imei2: p1.slice(15,30)||'' };
-  // Method 3: root via /sys or /dev/block/modem
-  const r3 = await adbShell(serial, "su -c 'cat /sys/devices/soc/4080000.qcom,mss/net/rmnet_ipa0/address 2>/dev/null || getprop gsm.imei'").catch(()=>({out:''}));
-  const imei1c = parseServiceCall(r3.out);
-  if (imei1c.length === 15) return { imei1: imei1c, imei2: '' };
-  return { imei1: '', imei2: '' };
+  const isImei = (s) => /^\d{15}$/.test((s||'').trim());
+  const clean = (s) => (s||'').replace(/[^0-9]/g,'').slice(0,15);
+
+  // Method 1: service call iphonesubinfo slot 0 (Android <10 or root)
+  const r1 = await adbShell(serial, "service call iphonesubinfo 1 i32 0 2>/dev/null", 6000).catch(()=>({out:''}));
+  const m1 = (r1.out.match(/'([0-9.]+)'/g)||[]).map(s=>s.replace(/['.]/g,'')).join('');
+  if (isImei(clean(m1))) return { imei1: clean(m1), imei2: '' };
+
+  // Method 2: getprop variants (older Samsung/MTK)
+  for (const prop of ['ril.imei','ril.imei1','gsm.imei','ro.ril.imei','persist.radio.device.imei','persist.ril.imei']) {
+    const p = await adbShell(serial, `su -c 'getprop ${prop} 2>/dev/null'`, 4000).catch(()=>({out:''}));
+    const v = clean(p.out);
+    if (isImei(v)) return { imei1: v, imei2: '' };
+  }
+
+  // Method 3: Qualcomm /sys path (root)
+  const r3 = await adbShell(serial, "su -c 'cat /sys/devices/soc/4080000.qcom,mss/net/rmnet_ipa0/address 2>/dev/null'", 5000).catch(()=>({out:''}));
+  if (isImei(clean(r3.out))) return { imei1: clean(r3.out), imei2: '' };
+
+  // Method 4: Samsung telephony content provider (root, Android 12+)
+  const r4 = await adbShell(serial, "su -c 'content query --uri content://telephony/siminfo --projection imsi,icc_id 2>/dev/null | grep -oE \"[0-9]{15}\"' 2>/dev/null", 5000).catch(()=>({out:''}));
+  const m4 = (r4.out.match(/\d{15}/)||[])[0]||'';
+  if (isImei(m4)) return { imei1: m4, imei2: '' };
+
+  // Method 5: MTK modem path (root)
+  const r5 = await adbShell(serial, "su -c 'cat /sys/class/net/ccmni0/address 2>/dev/null || strings /dev/block/by-name/nvdata 2>/dev/null | grep -E \"^[0-9]{15}$\" | head -2'", 5000).catch(()=>({out:''}));
+  const m5 = (r5.out.match(/\d{15}/g)||[]).find(v=>isImei(v))||'';
+  if (m5) return { imei1: m5, imei2: '' };
+
+  return { imei1: '', imei2: '', note: 'Samsung Android 12+: IMEI en NV RAM binario. Usa modo Download + Heimdall o MTK/QC según chipset.' };
 }
 
 async function deviceInfo(serial) {
@@ -218,38 +233,87 @@ const BATTERY_STATUS = { '1':'Desconocido','2':'Cargando','3':'Descargando','4':
 const BATTERY_PLUGGED = { '0':'No conectado','1':'AC','2':'USB','4':'Wireless' };
 
 async function adbBatteryInfo(serial) {
-  const [r, rSys] = await Promise.all([
-    adbShell(serial, 'dumpsys battery 2>/dev/null'),
-    adbShell(serial, 'cat /sys/class/power_supply/battery/charge_counter /sys/class/power_supply/battery/cycle_count /sys/class/power_supply/battery/charge_full /sys/class/power_supply/battery/charge_full_design 2>/dev/null'),
+  // Try with root first for more data, fallback to shell user
+  const [rRoot, rUevent] = await Promise.all([
+    adbShell(serial, "su -c 'dumpsys battery 2>/dev/null' 2>/dev/null", 8000).catch(()=>({out:''})),
+    adbShell(serial, "su -c 'cat /sys/class/power_supply/battery/uevent 2>/dev/null' 2>/dev/null", 6000).catch(()=>({out:''})),
   ]);
-  const parse = (key) => { const m = r.out.match(new RegExp(key + ':\\s*(.+)')); return m ? m[1].trim() : ''; };
-  const level = parse('level');
-  const healthCode = parse('health');
-  const statusCode = parse('status');
-  const pluggedCode = parse('plugged');
-  const voltageRaw = parse('voltage');
-  const tempRaw = parse('temperature');
-  const technology = parse('technology');
-  const maxChargingVoltage = parse('Max charging voltage');
-  // Parse sys values
-  const sysLines = rSys.out.trim().split('\n').map(l => l.trim()).filter(Boolean);
-  const cycleCount = sysLines.find(l => /^\d+$/.test(l) && parseInt(l) < 10000) || '';
-  const chargeFull = sysLines.find(l => /^\d{4,}$/.test(l)) || '';
-  const chargeDesign = sysLines.filter(l => /^\d{4,}$/.test(l))[1] || '';
-  const healthPct = (chargeFull && chargeDesign && parseInt(chargeDesign) > 0)
-    ? Math.round(parseInt(chargeFull) / parseInt(chargeDesign) * 100) + '%' : '';
-  return {
-    'Nivel': level ? level + '%' : '',
-    'Estado': BATTERY_STATUS[statusCode] || statusCode,
-    'Salud': BATTERY_HEALTH[healthCode] || healthCode,
-    'Salud capacidad': healthPct,
-    'Ciclos de carga': cycleCount,
-    'Conectado a': BATTERY_PLUGGED[pluggedCode] || pluggedCode,
-    'Voltaje': voltageRaw ? (parseInt(voltageRaw) / 1000).toFixed(3) + ' V' : '',
-    'Temperatura': tempRaw ? (parseInt(tempRaw) / 10).toFixed(1) + ' °C' : '',
-    'Tecnología': technology,
-    'Voltaje máx. carga': maxChargingVoltage ? parseInt(maxChargingVoltage) / 1000 + ' V' : '',
+  const r = rRoot.out.length > 50 ? rRoot : await adbShell(serial, 'dumpsys battery 2>/dev/null', 8000).catch(()=>({out:''}));
+
+  // Anchored multiline parse — avoids "Max charging voltage" matching "voltage:"
+  const parseField = (out, key) => {
+    const m = out.match(new RegExp(`^[ \\t]*${key}:[ \\t]*(.+)`, 'm'));
+    return m ? m[1].trim() : '';
   };
+
+  const level      = parseField(r.out, 'level');
+  const healthCode = parseField(r.out, 'health');
+  const statusCode = parseField(r.out, 'status');
+  const pluggedCode = parseField(r.out, 'plugged');
+  const voltageRaw = parseField(r.out, 'voltage');   // "3901" (mV) — no longer captures "Max charging voltage"
+  const tempRaw    = parseField(r.out, 'temperature');
+  const technology = parseField(r.out, 'technology');
+
+  // Parse uevent (key=value pairs, µV and µAh)
+  const uevent = {};
+  rUevent.out.split('\n').forEach(l => { const i = l.indexOf('='); if (i > 0) uevent[l.slice(0,i).trim()] = l.slice(i+1).trim(); });
+  const voltageUV   = uevent['POWER_SUPPLY_VOLTAGE_NOW'];   // µV
+  const chargeFull  = uevent['POWER_SUPPLY_CHARGE_FULL'];   // µAh
+  const chargeDesign= uevent['POWER_SUPPLY_CHARGE_FULL_DESIGN']; // µAh
+  const chargeNow   = uevent['POWER_SUPPLY_CHARGE_NOW'];    // µAh
+
+  // Voltage: prefer uevent µV → V; fallback dumpsys mV → V
+  let voltageStr = '';
+  if (voltageUV && parseInt(voltageUV) > 500000) {
+    voltageStr = (parseInt(voltageUV) / 1000000).toFixed(3) + ' V';
+  } else if (voltageRaw && parseInt(voltageRaw) > 100) {
+    voltageStr = (parseInt(voltageRaw) / 1000).toFixed(3) + ' V';
+  }
+
+  // Samsung EFS — available only with root (non-blocking, short timeout)
+  const [asocR, bsohR, cableR, daysR] = await Promise.all([
+    adbShell(serial, "su -c 'cat /efs/FactoryApp/asoc 2>/dev/null'", 4000).catch(()=>({out:''})),
+    adbShell(serial, "su -c 'cat /efs/FactoryApp/bsoh 2>/dev/null'", 4000).catch(()=>({out:''})),
+    adbShell(serial, "su -c 'cat /efs/FactoryApp/batt_cable_count 2>/dev/null'", 4000).catch(()=>({out:''})),
+    adbShell(serial, "su -c 'cat /efs/FactoryApp/batt_after_manufactured 2>/dev/null'", 4000).catch(()=>({out:''})),
+  ]);
+  const asoc      = asocR.out.trim();
+  const bsohRaw   = (bsohR.out.trim().match(/[\d.]+/)||[])[0]||'';
+  const cableCount= cableR.out.trim();
+  const daysInUse = daysR.out.trim();
+
+  const result = {
+    'Nivel':       level ? level + '%' : (uevent['POWER_SUPPLY_CAPACITY'] ? uevent['POWER_SUPPLY_CAPACITY'] + '%' : ''),
+    'Estado':      BATTERY_STATUS[statusCode] || uevent['POWER_SUPPLY_STATUS'] || statusCode,
+    'Salud':       BATTERY_HEALTH[healthCode] || healthCode,
+    'Voltaje':     voltageStr,
+    'Temperatura': tempRaw ? (parseInt(tempRaw) / 10).toFixed(1) + ' °C' : '',
+    'Tecnología':  technology || uevent['POWER_SUPPLY_TECHNOLOGY'] || '',
+    'Conectado a': BATTERY_PLUGGED[pluggedCode] || (uevent['POWER_SUPPLY_STATUS'] === 'Charging' ? 'Cargando' : ''),
+  };
+
+  // Capacity health from uevent
+  if (chargeFull && chargeDesign && parseInt(chargeDesign) > 0) {
+    const mAhFull   = Math.round(parseInt(chargeFull) / 1000);
+    const mAhDesign = Math.round(parseInt(chargeDesign) / 1000);
+    const pct       = Math.round(parseInt(chargeFull) / parseInt(chargeDesign) * 100);
+    result['Capacidad'] = `${mAhFull} mAh de ${mAhDesign} mAh (${pct}%)`;
+  }
+  if (chargeNow && parseInt(chargeNow) > 0) {
+    result['Carga actual'] = Math.round(parseInt(chargeNow) / 1000) + ' mAh';
+  }
+
+  // Samsung EFS data (only if root returned data)
+  if (asoc) result['Salud ASOC'] = asoc + '%  (desgaste real Samsung)';
+  if (bsohRaw) result['Salud BSOH'] = parseFloat(bsohRaw).toFixed(1) + '%  (capacidad vs diseño)';
+  if (cableCount) result['Eventos de carga'] = parseInt(cableCount).toLocaleString() + ' ciclos';
+  if (daysInUse) {
+    const d = parseInt(daysInUse);
+    const y = Math.floor(d / 365), mo = Math.floor((d % 365) / 30);
+    result['Días en uso'] = `${d} días${y ? `  (${y}a ${mo}m)` : ''}`;
+  }
+
+  return result;
 }
 
 async function adbStorageInfo(serial) {

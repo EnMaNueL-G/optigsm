@@ -170,7 +170,7 @@ async function selectDevice(d) {
   if (d.mode === 'adb' || d.state === 'device') {
     try {
       const info = await gsm.deviceInfo(d.serial);
-      selectedDevice = { ...d, ...info };
+      selectedDevice = { ...d, ...info, serial: d.serial }; // preserve ADB connection address
       updateHomeInfo(info);
     } catch (_) {}
   }
@@ -215,6 +215,45 @@ function showResult(r) {
   if (r && r.out) term(r.out, r.ok ? 'ok' : 'err');
   if (r && r.error) term(r.error, 'err');
   if (r && !r.ok && !r.out && !r.error) term('Operación completada', 'info');
+}
+
+function renderFirmwareResult(r) {
+  const el = document.getElementById('fwResult');
+  if (!el) return;
+  if (!r || (!r.note && !r.firmwares && !r.url)) {
+    el.textContent = JSON.stringify(r, null, 2);
+    return;
+  }
+  let html = '';
+  if (r.note) html += `<div class="fw-note">${escHtml(r.note)}</div>`;
+  if (r.fotaLatest && r.fotaLatest !== '(no disponible)') {
+    html += `<div class="fw-note ok">📡 Samsung FOTA: <strong>${escHtml(r.fotaLatest)}</strong></div>`;
+  }
+  if (r.firmwares && r.firmwares.length) {
+    html += `<table class="fw-table"><thead><tr><th>Versión</th><th>Fecha</th><th>Android</th><th>Tamaño</th></tr></thead><tbody>`;
+    r.firmwares.forEach(f => {
+      html += `<tr><td class="mono">${escHtml(f.version)}</td><td>${escHtml(f.date)}</td><td>${escHtml(f.os)}</td><td>${escHtml(f.size)}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  if (r.tools && r.tools.length) {
+    html += `<div class="fw-tools"><strong>Herramientas de descarga:</strong><div class="fw-links">`;
+    r.tools.forEach(t => {
+      html += `<a class="btn btn-sm" href="#" onclick="gsm.adb && window.open && require && require('electron').shell.openExternal('${escHtml(t.url)}');return false;">${escHtml(t.name)}</a>`;
+    });
+    html += `</div></div>`;
+    if (r.samfwUrl) document.getElementById('fwUrl') && (document.getElementById('fwUrl').value = r.samfwUrl);
+  } else if (r.url) {
+    html += `<div class="fw-note"><a href="#" onclick="return false;">${escHtml(r.url)}</a></div>`;
+    document.getElementById('fwUrl') && (document.getElementById('fwUrl').value = r.url);
+  }
+  if (!r.firmwares && !r.tools && r.urls) {
+    html += `<div class="fw-tools"><strong>Recursos:</strong><div class="fw-links">`;
+    (r.urls||[]).forEach(u => { html += `<span class="hint mono">${escHtml(u)}</span><br>`; });
+    html += `</div></div>`;
+  }
+  el.innerHTML = html;
+  document.getElementById('fwActions') && (document.getElementById('fwActions').style.display = '');
 }
 
 /* ===== ALL HANDLERS ===== */
@@ -486,8 +525,8 @@ function setupHandlers() {
     if (!model) { term('Introduce el modelo', 'warn'); return; }
     term(`Buscando firmware ${model} ${region}...`, 'info');
     const r = await gsm.samsung.searchFw(model, region);
-    document.getElementById('fwResult').textContent = JSON.stringify(r, null, 2);
-    term('Resultado mostrado en tab Firmware', 'info');
+    renderFirmwareResult(r);
+    term(r.note || 'Búsqueda completada.', 'info');
   };
 
   // ===== HUAWEI =====
@@ -563,7 +602,7 @@ function setupHandlers() {
     if (!model) { term('Introduce el modelo', 'warn'); return; }
     term(`Buscando firmware ${brand} ${model} ${region}...`, 'info');
     const r = await gsm.firmware.search(brand, model, region);
-    document.getElementById('fwResult').textContent = JSON.stringify(r, null, 2);
+    renderFirmwareResult(r);
     document.getElementById('fwActions').style.display = '';
   };
   document.getElementById('fwDownload').onclick = async () => {
