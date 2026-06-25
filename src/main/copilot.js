@@ -112,7 +112,7 @@ REGLAS:
 - Cuando des comandos ADB o shell, ponlos en bloques de código.`;
 
 // ── Chat principal ──────────────────────────────────────────────────────────
-async function chat({ messages, model, deviceInfo, backend }, onChunk) {
+async function chat({ messages, model, deviceInfo, backend }) {
   const ctx = buildDeviceContext(deviceInfo);
   const systemMsg = SYSTEM_PROMPT + (ctx && ctx !== 'No hay dispositivo conectado.'
     ? `\n\nDISPOSITIVO ACTUALMENTE CONECTADO:\n${ctx}`
@@ -123,51 +123,41 @@ async function chat({ messages, model, deviceInfo, backend }, onChunk) {
     ...(messages || []),
   ];
 
-  // Determine backend: auto-detect if not specified
   let useBackend = backend;
   if (!useBackend) {
     const b = await detectBackends();
     useBackend = b.ollama ? 'ollama' : (b.lmstudio ? 'lmstudio' : null);
   }
-  if (!useBackend) return { ok: false, out: 'No se detectó Ollama ni LM Studio.\n\nInstala Ollama: https://ollama.com\nO LM Studio: https://lmstudio.ai' };
-
-  let fullText = '';
-  const collectChunk = (raw) => {
-    // Parse streaming responses
-    raw.split('\n').forEach(line => {
-      line = line.trim();
-      if (!line || line === 'data: [DONE]') return;
-      if (line.startsWith('data: ')) line = line.slice(6);
-      try {
-        const j = JSON.parse(line);
-        // Ollama: j.message.content or j.response
-        // LM Studio / OpenAI: j.choices[0].delta.content
-        const token = (j.message && j.message.content) || j.response ||
-          (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) || '';
-        if (token) { fullText += token; if (onChunk) onChunk(token); }
-      } catch (_) {}
-    });
-  };
+  if (!useBackend) {
+    return { ok: false, out: 'No se detectó Ollama ni LM Studio activos.\n\nPara usar Co-Pilot:\n1. Abre LM Studio → carga un modelo → pulsa "Start Server"\n   o\n2. Instala Ollama y ejecuta: ollama run mistral' };
+  }
 
   try {
+    let r, text;
     if (useBackend === 'ollama') {
-      await httpPost(`${OLLAMA_BASE}/api/chat`, {
+      r = await httpPost(`${OLLAMA_BASE}/api/chat`, {
         model: model || 'mistral',
         messages: fullMessages,
-        stream: true,
-      }, collectChunk, 120000);
+        stream: false,
+      }, null, 180000);
+      if (!r.ok) return { ok: false, out: `Ollama respondió con error ${r.status}.\nRespuesta: ${r.data.slice(0, 300)}` };
+      const j = JSON.parse(r.data);
+      text = (j.message && j.message.content) || j.response || '';
     } else {
-      await httpPost(`${LMSTUDIO_BASE}/v1/chat/completions`, {
+      r = await httpPost(`${LMSTUDIO_BASE}/v1/chat/completions`, {
         model: model || 'local-model',
         messages: fullMessages,
-        stream: true,
+        stream: false,
         temperature: 0.7,
         max_tokens: 2048,
-      }, collectChunk, 120000);
+      }, null, 180000);
+      if (!r.ok) return { ok: false, out: `LM Studio respondió con error ${r.status}.\nRespuesta: ${r.data.slice(0, 300)}` };
+      const j = JSON.parse(r.data);
+      text = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
     }
-    return { ok: true, out: fullText };
+    return { ok: true, out: text || '(respuesta vacía del modelo)' };
   } catch (e) {
-    return { ok: false, out: `Error al conectar con ${useBackend}: ${e.message}` };
+    return { ok: false, out: `No se pudo conectar con ${useBackend}: ${e.message}\n\nVerifica que el servidor esté corriendo en localhost.` };
   }
 }
 

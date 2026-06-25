@@ -296,6 +296,10 @@ button, .btn { display: inline-flex; align-items: center; justify-content: cente
 /* ===== HINT ===== */
 .hint { font-size: 11px; color: var(--text2); }
 
+/* ===== ADVANCED RESULT ===== */
+.adv-result { margin-top: 8px; min-height: 24px; }
+.mono-out { font-family: var(--mono); font-size: 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; white-space: pre; color: var(--text); user-select: all; }
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

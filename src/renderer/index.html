@@ -480,6 +480,17 @@
               <button class="btn btn-warning" id="advMtkFrp">MTK FRP (BROM)</button>
               <button class="btn btn-warning" id="advQcFrp">QC FRP (EDL)</button>
             </div>
+            <div class="op-card">
+              <h4>Generador de IMEI (Luhn)</h4>
+              <div class="hint">Introduce el TAC (8 dígitos) o detéctalo del dispositivo conectado.</div>
+              <div class="fw-model-row">
+                <input class="input" id="advImeiTac" placeholder="TAC (8 dígitos, ej: 35674308)" maxlength="8">
+                <button class="btn btn-xs" id="advImeiDetectTac" title="Leer TAC del dispositivo conectado">📱 Detectar</button>
+              </div>
+              <input class="input" id="advImeiCount" type="number" min="1" max="20" value="5" placeholder="Cantidad">
+              <button class="btn btn-primary" id="advImeiGen">Generar IMEIs válidos</button>
+              <div class="adv-result mono-out" id="advImeiResult"></div>
+            </div>
           </div>
         </div>
       </div>

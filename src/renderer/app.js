@@ -40,6 +40,17 @@ function term(msg, type = 'data') {
 function termClear() { termBody.innerHTML = ''; }
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+function luhnCheck(digits14) {
+  const d = digits14.split('').map(Number);
+  let sum = 0;
+  for (let i = 0; i < 14; i++) {
+    let v = d[i];
+    if ((14 - i) % 2 === 0) { v *= 2; if (v > 9) v -= 9; }
+    sum += v;
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+
 gsm.onStream((d) => term(d.trim(), 'data'));
 gsm.onLog((e) => { if (e.level !== 'debug') term(e.msg, e.level === 'error' ? 'err' : e.level === 'ok' ? 'ok' : 'info'); });
 
@@ -723,6 +734,43 @@ function setupHandlers() {
   document.getElementById('advQcFrp').onclick = async () => {
     if (!confirm('¿FRP bypass QC (EDL)?')) return;
     term('FRP bypass QC...', 'warn'); showResult(await gsm.advanced.qcFrpBypass());
+  };
+
+  // IMEI Generator
+  document.getElementById('advImeiGen').onclick = () => {
+    const tacInput = document.getElementById('advImeiTac').value.trim();
+    const count = Math.min(20, Math.max(1, parseInt(document.getElementById('advImeiCount').value) || 5));
+    const result = document.getElementById('advImeiResult');
+    if (tacInput && !/^\d{8}$/.test(tacInput)) {
+      result.textContent = 'El TAC debe ser exactamente 8 dígitos numéricos.';
+      return;
+    }
+    const lines = [];
+    for (let i = 0; i < count; i++) {
+      const tac = tacInput || String(Math.floor(10000000 + Math.random() * 89999999));
+      const rand = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+      const base14 = tac + rand;
+      const check = luhnCheck(base14);
+      lines.push(base14 + check);
+    }
+    result.textContent = lines.join('\n');
+    term(`${count} IMEI(s) generados con TAC ${tacInput || '(aleatorio)'}`, 'ok');
+  };
+  document.getElementById('advImeiDetectTac').onclick = async () => {
+    const s = needDevice(); if (!s) return;
+    const r = await gsm.adb.shell(s, 'getprop ro.boot.hardware.revision 2>/dev/null || service call iphonesubinfo 4 2>/dev/null | grep -o "[0-9a-f]*\\.\\[0-9\\]*" | head -1');
+    // Read IMEI and extract TAC (first 8 digits)
+    const r2 = await gsm.adb.shell(s, 'service call iphonesubinfo 1 2>/dev/null');
+    const imeiMatch = (r2.out || '').replace(/[^0-9]/g, '');
+    if (imeiMatch && imeiMatch.length >= 8) {
+      document.getElementById('advImeiTac').value = imeiMatch.slice(0, 8);
+      term(`TAC detectado: ${imeiMatch.slice(0, 8)}`, 'ok');
+    } else {
+      const r3 = await gsm.adb.shell(s, 'dumpsys iphonesubinfo 2>/dev/null | grep -i "imei\\|device id" | head -3');
+      const m = (r3.out || '').match(/\d{15}/);
+      if (m) { document.getElementById('advImeiTac').value = m[0].slice(0, 8); term(`TAC: ${m[0].slice(0, 8)}`, 'ok'); }
+      else term('No se pudo leer IMEI/TAC (requiere root o privilegios)', 'warn');
+    }
   };
 
   // Settings
