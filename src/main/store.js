@@ -38,6 +38,23 @@ async function init() {
       size INTEGER, hash TEXT, ts TEXT
     );
     CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+    CREATE TABLE IF NOT EXISTS clients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL, phone TEXT, email TEXT, address TEXT, notes TEXT,
+      created_at INTEGER DEFAULT (strftime('%s','now'))
+    );
+    CREATE TABLE IF NOT EXISTS repairs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL, ticket TEXT UNIQUE,
+      device TEXT, brand TEXT, model TEXT, imei TEXT, color TEXT,
+      issue TEXT, diagnosis TEXT, solution TEXT,
+      status TEXT DEFAULT 'pending',
+      price REAL DEFAULT 0, deposit REAL DEFAULT 0, warranty_days INTEGER DEFAULT 90,
+      created_at INTEGER DEFAULT (strftime('%s','now')),
+      updated_at INTEGER DEFAULT (strftime('%s','now')),
+      delivered_at INTEGER,
+      FOREIGN KEY(client_id) REFERENCES clients(id)
+    );
   `);
 
   const defaults = { advancedMode: '0', theme: 'dark', adbPath: '', pythonPath: '', autoDetect: '1', logLevel: 'info' };
@@ -108,4 +125,4 @@ function getFirmwareCache(brand, model) {
   return queryAll('SELECT * FROM firmware_cache WHERE brand=? AND model=? ORDER BY ts DESC', [brand, model]);
 }
 
-module.exports = { init, getSetting, setSetting, getAllSettings, logOperation, getOperations, upsertDevice, getDevices, cacheFirmware, getFirmwareCache };
+module.exports = { init, getSetting, setSetting, getAllSettings, logOperation, getOperations, upsertDevice, getDevices, cacheFirmware, getFirmwareCache, queryAll, queryOne, run, save };

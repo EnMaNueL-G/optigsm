@@ -140,6 +140,31 @@ contextBridge.exposeInMainWorld('gsm', {
     log: (op) => ipcRenderer.invoke('history:log', op),
   },
 
+  // CRM
+  crm: {
+    clients: (search) => ipcRenderer.invoke('crm:clients', search),
+    client: (id) => ipcRenderer.invoke('crm:client', id),
+    upsertClient: (data) => ipcRenderer.invoke('crm:upsertClient', data),
+    deleteClient: (id) => ipcRenderer.invoke('crm:deleteClient', id),
+    repairs: (clientId) => ipcRenderer.invoke('crm:repairs', clientId),
+    repair: (id) => ipcRenderer.invoke('crm:repair', id),
+    upsertRepair: (data) => ipcRenderer.invoke('crm:upsertRepair', data),
+    stats: () => ipcRenderer.invoke('crm:stats'),
+  },
+
+  // Utilidades
+  util: {
+    hashFile: (filePath, algo) => ipcRenderer.invoke('util:hashFile', filePath, algo),
+  },
+
+  // Logcat
+  logcat: {
+    start: (serial, level, tag, pkg) => ipcRenderer.invoke('adb:logcatStart', serial, level, tag, pkg),
+    stop: () => ipcRenderer.invoke('adb:logcatStop'),
+    onLine: (cb) => ipcRenderer.on('logcat:line', (_, l) => cb(l)),
+    offLine: () => ipcRenderer.removeAllListeners('logcat:line'),
+  },
+
   // File pickers
   pickFile: (opts) => ipcRenderer.invoke('dialog:pickFile', opts),
   pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory'),

@@ -15,6 +15,7 @@ const frp = require('./frp');
 const firmware = require('./firmware');
 const advanced = require('./advanced');
 const copilot = require('./copilot');
+const crm = require('./crm');
 
 let mainWin = null;
 
@@ -268,4 +269,45 @@ ipcMain.handle('copilot:chat', async (_, opts) => {
   return copilot.chat(opts, (token) => {
     if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('copilot:token', token);
   });
+});
+
+/* ===== CRM ===== */
+ipcMain.handle('crm:clients', (_, search) => ({ ok: true, data: crm.allClients(search) }));
+ipcMain.handle('crm:client', (_, id) => ({ ok: true, data: crm.getClient(id) }));
+ipcMain.handle('crm:upsertClient', (_, data) => crm.upsertClient(data));
+ipcMain.handle('crm:deleteClient', (_, id) => crm.deleteClient(id));
+ipcMain.handle('crm:repairs', (_, clientId) => ({ ok: true, data: crm.getRepairs(clientId) }));
+ipcMain.handle('crm:repair', (_, id) => ({ ok: true, data: crm.getRepair(id) }));
+ipcMain.handle('crm:upsertRepair', (_, data) => crm.upsertRepair(data));
+ipcMain.handle('crm:stats', () => ({ ok: true, data: crm.repairStats() }));
+
+/* ===== Hash / verificación firmware ===== */
+ipcMain.handle('util:hashFile', async (_, filePath, algo) => {
+  const crypto = require('crypto');
+  return new Promise((resolve) => {
+    const hash = crypto.createHash(algo || 'sha256');
+    const stream = require('fs').createReadStream(filePath);
+    stream.on('data', d => hash.update(d));
+    stream.on('end', () => resolve({ ok: true, hash: hash.digest('hex'), algo: algo || 'sha256' }));
+    stream.on('error', e => resolve({ ok: false, out: e.message }));
+  });
+});
+
+/* ===== Logcat ===== */
+let _logcatProc = null;
+ipcMain.handle('adb:logcatStart', async (_, serial, level, tag, pkg) => {
+  if (_logcatProc) { try { _logcatProc.kill(); } catch (_) {} _logcatProc = null; }
+  const { spawn } = require('child_process');
+  const args = ['-s', serial, 'logcat', '-v', 'brief', `*:${level || 'I'}`];
+  if (tag) args.push(`${tag}:${level || 'I'}`, '*:S');
+  _logcatProc = spawn(adb.resolveAdb(), args);
+  _logcatProc.stdout.on('data', (d) => {
+    const lines = d.toString().split('\n').filter(Boolean);
+    lines.forEach(l => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('logcat:line', l); });
+  });
+  return { ok: true };
+});
+ipcMain.handle('adb:logcatStop', () => {
+  if (_logcatProc) { try { _logcatProc.kill(); } catch (_) {} _logcatProc = null; }
+  return { ok: true };
 });
