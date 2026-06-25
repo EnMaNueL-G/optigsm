@@ -112,7 +112,7 @@ REGLAS:
 - Cuando des comandos ADB o shell, ponlos en bloques de código.`;
 
 // ── Chat principal ──────────────────────────────────────────────────────────
-async function chat({ messages, model, deviceInfo, backend }) {
+async function chat({ messages, model, deviceInfo, backend }, onChunk) {
   const ctx = buildDeviceContext(deviceInfo);
   const systemMsg = SYSTEM_PROMPT + (ctx && ctx !== 'No hay dispositivo conectado.'
     ? `\n\nDISPOSITIVO ACTUALMENTE CONECTADO:\n${ctx}`
@@ -132,30 +132,45 @@ async function chat({ messages, model, deviceInfo, backend }) {
     return { ok: false, out: 'No se detectó Ollama ni LM Studio activos.\n\nPara usar Co-Pilot:\n1. Abre LM Studio → carga un modelo → pulsa "Start Server"\n   o\n2. Instala Ollama y ejecuta: ollama run mistral' };
   }
 
+  let fullText = '';
+  let sseBuffer = '';
+
+  const collectChunk = (raw) => {
+    sseBuffer += raw;
+    const lines = sseBuffer.split('\n');
+    sseBuffer = lines.pop(); // guardar línea incompleta para el siguiente chunk
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === 'data: [DONE]') continue;
+      const data = trimmed.startsWith('data: ') ? trimmed.slice(6) : trimmed;
+      try {
+        const j = JSON.parse(data);
+        const token = (j.message && j.message.content) || j.response ||
+          (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) || '';
+        if (token) { fullText += token; if (onChunk) onChunk(token); }
+      } catch (_) {}
+    }
+  };
+
   try {
-    let r, text;
     if (useBackend === 'ollama') {
-      r = await httpPost(`${OLLAMA_BASE}/api/chat`, {
+      const r = await httpPost(`${OLLAMA_BASE}/api/chat`, {
         model: model || 'mistral',
         messages: fullMessages,
-        stream: false,
-      }, null, 180000);
-      if (!r.ok) return { ok: false, out: `Ollama respondió con error ${r.status}.\nRespuesta: ${r.data.slice(0, 300)}` };
-      const j = JSON.parse(r.data);
-      text = (j.message && j.message.content) || j.response || '';
+        stream: true,
+      }, collectChunk, 180000);
+      if (!r.ok && !fullText) return { ok: false, out: `Ollama error ${r.status}: ${r.data.slice(0, 300)}` };
     } else {
-      r = await httpPost(`${LMSTUDIO_BASE}/v1/chat/completions`, {
+      const r = await httpPost(`${LMSTUDIO_BASE}/v1/chat/completions`, {
         model: model || 'local-model',
         messages: fullMessages,
-        stream: false,
+        stream: true,
         temperature: 0.7,
         max_tokens: 2048,
-      }, null, 180000);
-      if (!r.ok) return { ok: false, out: `LM Studio respondió con error ${r.status}.\nRespuesta: ${r.data.slice(0, 300)}` };
-      const j = JSON.parse(r.data);
-      text = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+      }, collectChunk, 180000);
+      if (!r.ok && !fullText) return { ok: false, out: `LM Studio error ${r.status}: ${r.data.slice(0, 300)}` };
     }
-    return { ok: true, out: text || '(respuesta vacía del modelo)' };
+    return { ok: true, out: fullText || '(respuesta vacía del modelo)' };
   } catch (e) {
     return { ok: false, out: `No se pudo conectar con ${useBackend}: ${e.message}\n\nVerifica que el servidor esté corriendo en localhost.` };
   }

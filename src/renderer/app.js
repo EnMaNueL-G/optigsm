@@ -1092,10 +1092,19 @@ async function copilotSend() {
   cpMessages.push({ role: 'user', content: text });
   cpAddMessage('user', text);
 
-  const assistDiv = cpAddMessage('assistant', '...', true);
+  const assistDiv = cpAddMessage('assistant', '', true);
   const sendBtn = document.getElementById('cpSend');
   if (sendBtn) sendBtn.disabled = true;
   _cpSending = true;
+
+  let streamBuffer = '';
+  gsm.copilot.offToken();
+  gsm.copilot.onToken((token) => {
+    streamBuffer += token;
+    cpUpdateBubble(assistDiv, streamBuffer);
+    const msgs = document.getElementById('cpMessages');
+    if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  });
 
   const r = await gsm.copilot.chat({
     messages: cpMessages,
@@ -1104,16 +1113,17 @@ async function copilotSend() {
     deviceInfo: cpDeviceInfo,
   }).catch(e => ({ ok: false, out: e.message }));
 
+  gsm.copilot.offToken();
   _cpSending = false;
   if (sendBtn) sendBtn.disabled = false;
   assistDiv.classList.remove('cp-streaming');
 
   const finalText = r.out || (r.ok ? '(sin respuesta)' : 'No se pudo conectar con el modelo. Verifica que Ollama o LM Studio esté activo y tengas un modelo cargado.');
-  cpUpdateBubble(assistDiv, finalText);
+  cpUpdateBubble(assistDiv, streamBuffer || finalText);
   const msgs = document.getElementById('cpMessages');
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
   if (r.ok && r.out) cpMessages.push({ role: 'assistant', content: r.out });
-  else if (!r.ok) term('Co-Pilot error: ' + finalText, 'err');
+  else if (!r.ok) { cpUpdateBubble(assistDiv, finalText); term('Co-Pilot error: ' + finalText, 'err'); }
 }
 
 function copilotClear() {

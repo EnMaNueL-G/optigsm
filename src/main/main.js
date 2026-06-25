@@ -265,5 +265,7 @@ ipcMain.handle('copilot:check', async () => copilot.detectBackends());
 ipcMain.handle('copilot:models', async () => copilot.listModels());
 ipcMain.handle('copilot:prompts', async () => copilot.QUICK_PROMPTS);
 ipcMain.handle('copilot:chat', async (_, opts) => {
-  return copilot.chat(opts, (token) => sendStream(token));
+  return copilot.chat(opts, (token) => {
+    if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('copilot:token', token);
+  });
 });

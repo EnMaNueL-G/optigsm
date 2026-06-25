@@ -130,6 +130,8 @@ contextBridge.exposeInMainWorld('gsm', {
     models: () => ipcRenderer.invoke('copilot:models'),
     prompts: () => ipcRenderer.invoke('copilot:prompts'),
     chat: (opts) => ipcRenderer.invoke('copilot:chat', opts),
+    onToken: (cb) => ipcRenderer.on('copilot:token', (_, t) => cb(t)),
+    offToken: () => ipcRenderer.removeAllListeners('copilot:token'),
   },
 
   // History
