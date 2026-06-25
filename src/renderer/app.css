@@ -307,7 +307,9 @@ button, .btn { display: inline-flex; align-items: center; justify-content: cente
 .calc-result { margin-top: 10px; padding: 10px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--mono); font-size: 13px; min-height: 36px; white-space: pre-line; }
 
 /* ===== TEST HARDWARE ===== */
+.hwt-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
 .hwt-btn { margin: 2px; }
+.repair-card { border-left: 3px solid var(--accent); }
 
 /* ===== CRM CLIENTES ===== */
 .clients-layout { display: flex; gap: 12px; flex: 1; min-height: 0; overflow: hidden; }

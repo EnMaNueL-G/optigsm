@@ -98,7 +98,7 @@ ipcMain.handle('device:info', async (_, serial) => {
 ipcMain.handle('device:usb', () => device.detectUsbDevices());
 
 /* ===== ADB ===== */
-ipcMain.handle('adb:shell', async (_, serial, cmd) => adb.adbShell(serial, cmd));
+ipcMain.handle('adb:shell', async (_, serial, cmd, timeout) => adb.adbShell(serial, cmd, timeout));
 ipcMain.handle('adb:install', async (_, serial, apkPath, opts) => adb.adbInstall(serial, apkPath, opts));
 ipcMain.handle('adb:uninstall', async (_, serial, pkg, keepData) => adb.adbUninstall(serial, pkg, keepData));
 ipcMain.handle('adb:packages', async (_, serial, flags) => adb.adbListPackages(serial, flags));

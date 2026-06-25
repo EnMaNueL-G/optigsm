@@ -50,6 +50,13 @@
         <button class="nav-item" data-tab="fastboot">🚀 Fastboot</button>
       </div>
       <div class="nav-section">
+        <div class="nav-label">HERRAMIENTAS</div>
+        <button class="nav-item" data-tab="clients">👥 Clientes CRM</button>
+        <button class="nav-item" data-tab="hwtest">🖥️ Test Hardware</button>
+        <button class="nav-item" data-tab="calc">🧮 Calculadoras</button>
+        <button class="nav-item" data-tab="adbterm">💻 Terminal ADB</button>
+      </div>
+      <div class="nav-section">
         <div class="nav-label">SISTEMA</div>
         <button class="nav-item" data-tab="copilot">🤖 Co-Pilot IA</button>
         <button class="nav-item" data-tab="advanced" id="navAdvanced">🔒 Avanzado</button>
@@ -711,6 +718,297 @@
               <strong>Plataformas:</strong> ADB · MTK · Qualcomm · Samsung · Huawei · Unisoc<br>
               <strong>Nota:</strong> Código privado. Uso personal y profesional autorizado.
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLIENTES CRM -->
+      <div class="tab-panel" id="tab-clients">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <h2 class="panel-title" style="margin:0">👥 Clientes CRM</h2>
+          <button class="btn btn-primary btn-sm" id="cliNew">+ Nuevo cliente</button>
+          <input class="input" id="cliSearch" placeholder="Buscar cliente..." style="flex:1;max-width:220px">
+          <button class="btn btn-sm" id="cliRefresh">↻</button>
+        </div>
+        <div class="clients-layout">
+          <div class="clients-list" id="clientList">
+            <div style="padding:16px;color:var(--text2);font-size:12px">Cargando...</div>
+          </div>
+          <div class="client-detail" id="clientDetail">
+            <div class="empty-state" style="padding:40px;text-align:center;color:var(--text2)">
+              Selecciona un cliente o crea uno nuevo
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TEST HARDWARE -->
+      <div class="tab-panel" id="tab-hwtest">
+        <h2 class="panel-title">🖥️ Test Hardware</h2>
+        <div class="op-cards">
+          <!-- Pantalla -->
+          <div class="op-card">
+            <h4>Pantalla</h4>
+            <div class="hwt-row">
+              <button class="btn btn-sm hwt-btn" id="hwtPixelTest">🔲 Test píxeles</button>
+              <button class="btn btn-sm hwt-btn" data-test="screen-black" style="background:#000;color:#fff;border:1px solid #333">Negro</button>
+              <button class="btn btn-sm hwt-btn" data-test="screen-white" style="background:#fff;color:#000;border:1px solid #ccc">Blanco</button>
+              <button class="btn btn-sm hwt-btn" data-test="screen-red" style="background:#e00;color:#fff">Rojo</button>
+              <button class="btn btn-sm hwt-btn" data-test="screen-green" style="background:#0c0;color:#fff">Verde</button>
+              <button class="btn btn-sm hwt-btn" data-test="screen-blue" style="background:#00e;color:#fff">Azul</button>
+            </div>
+          </div>
+          <!-- Touch -->
+          <div class="op-card">
+            <h4>Touch</h4>
+            <div class="hwt-row">
+              <button class="btn btn-sm" id="hwtTouchTest">✋ Test dibujo</button>
+              <button class="btn btn-sm" id="hwtTouchInfo">ℹ️ Info driver</button>
+            </div>
+          </div>
+          <!-- Sensores -->
+          <div class="op-card">
+            <h4>Sensores</h4>
+            <button class="btn btn-sm" id="hwtSensors">📡 Listar sensores</button>
+            <pre class="mono-out" id="hwtSensorOut" style="margin-top:8px;max-height:120px;overflow-y:auto;font-size:11px"></pre>
+          </div>
+          <!-- Audio -->
+          <div class="op-card">
+            <h4>Audio</h4>
+            <div class="hwt-row">
+              <button class="btn btn-sm" id="hwtSpeaker">🔊 Altavoz</button>
+              <button class="btn btn-sm" id="hwtMic">🎙️ Micrófono</button>
+              <button class="btn btn-sm" id="hwtEarpiece">👂 Auricular</button>
+            </div>
+          </div>
+          <!-- Cámara -->
+          <div class="op-card">
+            <h4>Cámara</h4>
+            <div class="hwt-row">
+              <button class="btn btn-sm" id="hwtCamBack">📷 Trasera</button>
+              <button class="btn btn-sm" id="hwtCamFront">🤳 Frontal</button>
+              <button class="btn btn-sm" id="hwtCamInfo">ℹ️ Info cámaras</button>
+            </div>
+          </div>
+          <!-- Vibración -->
+          <div class="op-card">
+            <h4>Vibración</h4>
+            <div class="hwt-row">
+              <button class="btn btn-sm" id="hwtVib1">📳 Corta (200ms)</button>
+              <button class="btn btn-sm" id="hwtVib2">📳 Larga (1s)</button>
+              <button class="btn btn-sm" id="hwtVib3">📳 Patrón SOS</button>
+            </div>
+          </div>
+          <!-- Conectividad -->
+          <div class="op-card">
+            <h4>Conectividad</h4>
+            <div class="hwt-row">
+              <button class="btn btn-sm" id="hwtWifi">📶 WiFi info</button>
+              <button class="btn btn-sm" id="hwtBt">🔵 Bluetooth info</button>
+              <button class="btn btn-sm" id="hwtUsb">🔌 USB config</button>
+            </div>
+          </div>
+          <!-- Consumo apps -->
+          <div class="op-card">
+            <h4>Consumo de batería</h4>
+            <button class="btn btn-sm" id="hwtBatteryApps">🔋 Consumo por apps</button>
+            <pre class="mono-out" id="hwtBatteryOut" style="margin-top:8px;max-height:120px;overflow-y:auto;font-size:11px"></pre>
+          </div>
+          <!-- Captura -->
+          <div class="op-card">
+            <h4>Captura de pantalla / Screencast</h4>
+            <div class="hwt-row">
+              <button class="btn btn-sm" id="hwtScreenshot">📸 Screenshot</button>
+              <button class="btn btn-sm" id="hwtScreencast">🎬 Screencast</button>
+              <input class="input" id="hwtRecordSec" type="number" value="10" min="5" max="120" style="width:60px" title="Duración (seg)">
+              <span style="font-size:12px;color:var(--text2)">seg</span>
+            </div>
+          </div>
+        </div>
+        <div class="adv-result"><pre class="mono-out" id="hwtResult"></pre></div>
+      </div>
+
+      <!-- CALCULADORAS -->
+      <div class="tab-panel" id="tab-calc">
+        <h2 class="panel-title">🧮 Calculadoras Técnicas</h2>
+        <div class="sub-tabs" id="calcTabs">
+          <button class="tab-sub active" data-sub="res">Resistencias</button>
+          <button class="tab-sub" data-sub="vdiv">Divisor V</button>
+          <button class="tab-sub" data-sub="vdrop">Caída AWG</button>
+          <button class="tab-sub" data-sub="batt">Batería</button>
+          <button class="tab-sub" data-sub="conv">Conversor</button>
+          <button class="tab-sub" data-sub="hash">Hash/CRC</button>
+          <button class="tab-sub" data-sub="base">Bases</button>
+          <button class="tab-sub" data-sub="rc">RC / Frec</button>
+        </div>
+
+        <!-- Resistencias -->
+        <div class="sub-panel active" id="sub-res">
+          <div class="op-card">
+            <h4>Resistencias en serie / paralelo</h4>
+            <div class="calc-row"><label>R1 (Ω)</label><input class="input" id="resR1" type="number" placeholder="1000"></div>
+            <div class="calc-row"><label>R2 (Ω)</label><input class="input" id="resR2" type="number" placeholder="2200"></div>
+            <div class="calc-row"><label>R3 (Ω, opcional)</label><input class="input" id="resR3" type="number" placeholder="4700"></div>
+            <div class="calc-row"><label>Modo</label>
+              <select class="input" id="resMode"><option value="serie">Serie</option><option value="par">Paralelo</option></select>
+            </div>
+            <button class="btn btn-primary btn-sm" id="resCalc">Calcular</button>
+            <div class="calc-result" id="resResult"></div>
+          </div>
+        </div>
+
+        <!-- Divisor de tensión -->
+        <div class="sub-panel" id="sub-vdiv">
+          <div class="op-card">
+            <h4>Divisor de tensión</h4>
+            <div class="calc-row"><label>Vin (V)</label><input class="input" id="vdivVin" type="number" placeholder="12"></div>
+            <div class="calc-row"><label>R1 (Ω)</label><input class="input" id="vdivR1" type="number" placeholder="10000"></div>
+            <div class="calc-row"><label>R2 (Ω)</label><input class="input" id="vdivR2" type="number" placeholder="4700"></div>
+            <button class="btn btn-primary btn-sm" id="vdivCalc">Calcular</button>
+            <div class="calc-result" id="vdivResult"></div>
+          </div>
+        </div>
+
+        <!-- Caída AWG -->
+        <div class="sub-panel" id="sub-vdrop">
+          <div class="op-card">
+            <h4>Caída de voltaje en cable (cobre)</h4>
+            <div class="calc-row"><label>Sección (mm²)</label><input class="input" id="vdropAwg" type="number" placeholder="1.5" step="0.1"></div>
+            <div class="calc-row"><label>Longitud (m)</label><input class="input" id="vdropLen" type="number" placeholder="5"></div>
+            <div class="calc-row"><label>Corriente (A)</label><input class="input" id="vdropI" type="number" placeholder="2"></div>
+            <button class="btn btn-primary btn-sm" id="vdropCalc">Calcular</button>
+            <div class="calc-result" id="vdropResult"></div>
+          </div>
+        </div>
+
+        <!-- Batería -->
+        <div class="sub-panel" id="sub-batt">
+          <div class="op-card">
+            <h4>Tiempo de carga / descarga de batería</h4>
+            <div class="calc-row"><label>Capacidad (mAh)</label><input class="input" id="battCap" type="number" placeholder="4000"></div>
+            <div class="calc-row"><label>Corriente (mA)</label><input class="input" id="battI" type="number" placeholder="500"></div>
+            <div class="calc-row"><label>Eficiencia (%)</label><input class="input" id="battEff" type="number" value="85" min="50" max="99"></div>
+            <button class="btn btn-primary btn-sm" id="battCalc">Calcular</button>
+            <div class="calc-result" id="battResult"></div>
+          </div>
+        </div>
+
+        <!-- Conversor unidades RF -->
+        <div class="sub-panel" id="sub-conv">
+          <div class="op-card">
+            <h4>Conversor de unidades (RF / potencia)</h4>
+            <div class="calc-row">
+              <label>Valor</label><input class="input" id="convVal" type="number" placeholder="0">
+              <select class="input" id="convFrom" style="width:80px">
+                <option value="dbm">dBm</option>
+                <option value="mw">mW</option>
+                <option value="w">W</option>
+                <option value="v">V</option>
+                <option value="mv">mV</option>
+                <option value="uv">µV</option>
+              </select>
+              <span>→</span>
+              <select class="input" id="convTo" style="width:80px">
+                <option value="w">W</option>
+                <option value="mw">mW</option>
+                <option value="dbm">dBm</option>
+                <option value="v">V (50Ω)</option>
+                <option value="mv">mV (50Ω)</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm" id="convCalc">Convertir</button>
+            <div class="calc-result" id="convResult"></div>
+          </div>
+        </div>
+
+        <!-- Hash / CRC -->
+        <div class="sub-panel" id="sub-hash">
+          <div class="op-card">
+            <h4>Hash de archivos (MD5 / SHA1 / SHA256 / SHA512)</h4>
+            <div class="calc-row">
+              <button class="btn btn-primary btn-sm" id="hashPickFile">📂 Elegir archivo</button>
+              <span id="hashFileName" style="font-size:12px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+            </div>
+            <pre class="calc-result mono-out" id="hashResult" style="font-size:11px"></pre>
+          </div>
+        </div>
+
+        <!-- Bases -->
+        <div class="sub-panel" id="sub-base">
+          <div class="op-card">
+            <h4>Conversor de bases (Hex / Dec / Bin / ASCII)</h4>
+            <div class="calc-row"><label>Decimal</label><input class="input" id="baseDec" placeholder="255"></div>
+            <div class="calc-row"><label>Hexadecimal</label><input class="input" id="baseHex" placeholder="FF"></div>
+            <div class="calc-row"><label>Binario</label><input class="input" id="baseBin" placeholder="11111111"></div>
+            <div class="calc-row"><label>ASCII (char)</label><input class="input" id="baseAsc" maxlength="1" placeholder="A"></div>
+            <div class="calc-row"><label>Dirección hex</label><input class="input" id="baseAddr" placeholder="0x1A2B3C"></div>
+            <pre class="calc-result mono-out" id="baseResult"></pre>
+          </div>
+        </div>
+
+        <!-- RC / Frecuencia -->
+        <div class="sub-panel" id="sub-rc">
+          <div class="op-card">
+            <h4>Circuito RC — Constante de tiempo y frecuencia de corte</h4>
+            <div class="calc-row"><label>R (Ω)</label><input class="input" id="rcR" type="number" placeholder="10000"></div>
+            <div class="calc-row"><label>C (µF)</label><input class="input" id="rcC" type="number" placeholder="0.1" step="0.001"></div>
+            <button class="btn btn-primary btn-sm" id="rcCalc">Calcular</button>
+            <div class="calc-result" id="rcResult"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TERMINAL ADB -->
+      <div class="tab-panel" id="tab-adbterm">
+        <h2 class="panel-title">💻 Terminal ADB</h2>
+        <div class="sub-tabs">
+          <button class="tab-sub active" data-sub="shell">Shell interactivo</button>
+          <button class="tab-sub" data-sub="logcat">Logcat</button>
+          <button class="tab-sub" data-sub="bugreport">Bugreport</button>
+        </div>
+
+        <!-- Shell -->
+        <div class="sub-panel active" id="sub-shell" style="flex-direction:column">
+          <div class="shell-suggestions" id="shellSuggest" style="display:flex;flex-wrap:wrap;gap:4px;padding:6px 0"></div>
+          <div class="term-output" id="shellOutput" style="flex:1;min-height:200px;padding:8px;overflow-y:auto;border-radius:6px;margin:4px 0"></div>
+          <div class="shell-composer">
+            <span style="color:#56d364;font-family:var(--mono)">$</span>
+            <input class="input" id="shellInput" placeholder="Comando ADB shell..." style="flex:1;font-family:var(--mono)">
+            <button class="btn btn-primary btn-sm" id="shellRun">Ejecutar</button>
+            <button class="btn btn-sm" id="shellClear">Limpiar</button>
+          </div>
+        </div>
+
+        <!-- Logcat -->
+        <div class="sub-panel" id="sub-logcat" style="flex-direction:column">
+          <div class="calc-row" style="padding:4px 0;flex-wrap:wrap;gap:6px">
+            <label style="min-width:auto">Nivel:</label>
+            <select class="input" id="logLevel" style="width:80px">
+              <option value="V">Verbose</option>
+              <option value="D">Debug</option>
+              <option value="I" selected>Info</option>
+              <option value="W">Warning</option>
+              <option value="E">Error</option>
+            </select>
+            <label style="min-width:auto">Tag:</label>
+            <input class="input" id="logTag" placeholder="Vacío = todos" style="width:130px">
+            <label style="min-width:auto">Paquete:</label>
+            <input class="input" id="logPkg" placeholder="com.ejemplo.app" style="width:160px">
+            <button class="btn btn-primary btn-sm" id="logStart">▶ Iniciar</button>
+            <button class="btn btn-sm" id="logStop">■ Detener</button>
+            <button class="btn btn-sm" id="logClear">Limpiar</button>
+            <button class="btn btn-sm" id="logSave">💾 Copiar</button>
+          </div>
+          <div class="term-output" id="logOutput" style="flex:1;min-height:260px;padding:8px;overflow-y:auto;border-radius:6px"></div>
+        </div>
+
+        <!-- Bugreport -->
+        <div class="sub-panel" id="sub-bugreport" style="flex-direction:column">
+          <div class="op-card">
+            <h4>Capturar Bugreport</h4>
+            <p class="hint">Genera un informe completo del sistema (logs, estado, traces). Puede tardar 1-2 minutos. Se guarda en <code>/sdcard/bugreport.zip</code>.</p>
+            <button class="btn btn-primary" id="bugCapture">📋 Capturar Bugreport</button>
+            <pre class="mono-out" id="bugResult" style="margin-top:10px"></pre>
           </div>
         </div>
       </div>

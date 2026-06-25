@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld('gsm', {
 
   // ADB operations
   adb: {
-    shell: (serial, cmd) => ipcRenderer.invoke('adb:shell', serial, cmd),
+    shell: (serial, cmd, timeout) => ipcRenderer.invoke('adb:shell', serial, cmd, timeout),
     security: (serial) => ipcRenderer.invoke('adb:security', serial),
     buildpropRead: (serial) => ipcRenderer.invoke('adb:buildpropRead', serial),
     buildpropWrite: (serial, key, val) => ipcRenderer.invoke('adb:buildpropWrite', serial, key, val),
