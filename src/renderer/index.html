@@ -53,6 +53,7 @@
         <div class="nav-label">HERRAMIENTAS</div>
         <button class="nav-item" data-tab="clients">👥 Clientes CRM</button>
         <button class="nav-item" data-tab="hwtest">🖥️ Test Hardware</button>
+        <button class="nav-item" data-tab="maint">🧹 Mantenimiento</button>
         <button class="nav-item" data-tab="calc">🧮 Calculadoras</button>
         <button class="nav-item" data-tab="adbterm">💻 Terminal ADB</button>
       </div>
@@ -1096,6 +1097,215 @@
             <pre class="mono-out" id="bugResult" style="margin-top:10px"></pre>
           </div>
         </div>
+      </div>
+
+      <!-- MANTENIMIENTO -->
+      <div class="tab-panel" id="tab-maint">
+        <h2 class="panel-title">🧹 Mantenimiento</h2>
+
+        <div class="sub-tabs">
+          <button class="tab-sub active" data-sub="maint-quick">⚡ Un clic</button>
+          <button class="tab-sub" data-sub="maint-clean">🗑️ Limpieza</button>
+          <button class="tab-sub" data-sub="maint-bloat">📦 Bloatware</button>
+          <button class="tab-sub" data-sub="maint-optim">⚙️ Optimización</button>
+          <button class="tab-sub" data-sub="maint-system">🔧 Sistema</button>
+          <button class="tab-sub" data-sub="maint-report">📋 Informe</button>
+        </div>
+
+        <!-- ── UN CLIC ── -->
+        <div class="sub-panel active" id="sub-maint-quick" style="flex-direction:column;gap:14px">
+          <div style="background:var(--bg-2);border-radius:10px;padding:16px">
+            <div style="font-weight:600;margin-bottom:10px;font-size:1rem">Mantenimiento completo</div>
+            <p style="color:var(--text-2);font-size:0.85rem;margin-bottom:14px">
+              Ejecuta todas las tareas de limpieza y optimización en un solo paso. Ideal para entregar el dispositivo al cliente.
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px" id="maintFullOpts">
+              <label class="maint-check"><input type="checkbox" id="optCache" checked> Limpiar caché de apps</label>
+              <label class="maint-check"><input type="checkbox" id="optLogs" checked> Limpiar logs del sistema</label>
+              <label class="maint-check"><input type="checkbox" id="optTemp" checked> Limpiar temporales</label>
+              <label class="maint-check"><input type="checkbox" id="optKillBg" checked> Matar procesos 2.º plano</label>
+              <label class="maint-check"><input type="checkbox" id="optBatt" checked> Reiniciar stats batería</label>
+              <label class="maint-check"><input type="checkbox" id="optClock" checked> Sincronizar fecha y hora</label>
+              <label class="maint-check"><input type="checkbox" id="optAnim" checked> Optimizar animaciones</label>
+            </div>
+            <button class="btn btn-primary" id="maintRunFull" style="width:100%">▶ Ejecutar mantenimiento completo</button>
+          </div>
+          <div id="maintFullResult" style="display:none;background:var(--bg-2);border-radius:10px;padding:14px">
+            <div style="font-weight:600;margin-bottom:8px">Resultado</div>
+            <div id="maintFullLog" style="font-size:0.82rem;line-height:1.7"></div>
+          </div>
+        </div>
+
+        <!-- ── LIMPIEZA ── -->
+        <div class="sub-panel" id="sub-maint-clean" style="flex-direction:column;gap:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+            <div class="maint-card">
+              <div class="maint-card-title">🗑️ Caché de aplicaciones</div>
+              <p class="maint-card-desc">Limpia la caché de todas las apps instaladas por el usuario.</p>
+              <button class="btn btn-sm btn-primary" id="btnClearCache">Limpiar caché</button>
+            </div>
+
+            <div class="maint-card">
+              <div class="maint-card-title">📁 Archivos temporales</div>
+              <p class="maint-card-desc">Elimina archivos temporales en /data/local/tmp.</p>
+              <button class="btn btn-sm btn-primary" id="btnClearTemp">Limpiar temporales</button>
+            </div>
+
+            <div class="maint-card">
+              <div class="maint-card-title">📜 Logs del sistema</div>
+              <p class="maint-card-desc">Borra los registros de logcat acumulados.</p>
+              <button class="btn btn-sm btn-primary" id="btnClearLogs">Limpiar logs</button>
+            </div>
+
+            <div class="maint-card">
+              <div class="maint-card-title">🔋 Estadísticas batería</div>
+              <p class="maint-card-desc">Reinicia las estadísticas de uso de batería (dumpsys reset).</p>
+              <button class="btn btn-sm btn-primary" id="btnResetBatt">Reiniciar stats</button>
+            </div>
+
+            <div class="maint-card">
+              <div class="maint-card-title">🔄 Caché Dalvik / ART</div>
+              <p class="maint-card-desc">Limpia la caché compilada del sistema (requiere root). Reinicia tras ejecutar.</p>
+              <button class="btn btn-sm" id="btnClearDalvik">Limpiar Dalvik</button>
+            </div>
+
+            <div class="maint-card">
+              <div class="maint-card-title">🛑 Procesos 2.º plano</div>
+              <p class="maint-card-desc">Detiene todos los procesos en segundo plano (am kill-all).</p>
+              <button class="btn btn-sm btn-primary" id="btnKillBg">Matar procesos</button>
+            </div>
+
+          </div>
+          <div id="cleanResult" class="mono-out" style="min-height:40px;margin-top:4px"></div>
+        </div>
+
+        <!-- ── BLOATWARE ── -->
+        <div class="sub-panel" id="sub-maint-bloat" style="flex-direction:column;gap:10px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-sm" id="btnLoadSysApps">Cargar apps del sistema</button>
+            <button class="btn btn-sm" id="btnBloatPreset">📋 Preset bloatware detectado</button>
+            <button class="btn btn-sm btn-primary" id="btnBatchDisable" style="margin-left:auto">Desactivar selección</button>
+            <button class="btn btn-sm" id="btnBatchEnable">Reactivar selección</button>
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-3)">
+            Marca las apps que quieres desactivar. Las apps desactivadas no se desinstalan y pueden reactivarse.
+          </div>
+          <div id="bloatSearchWrap" style="display:none">
+            <input class="input" id="bloatSearch" placeholder="Filtrar por nombre de paquete..." style="width:100%;margin-bottom:6px">
+          </div>
+          <div id="bloatList" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px">
+            <div style="color:var(--text-3);padding:10px;text-align:center;font-size:0.85rem">Pulsa "Cargar apps del sistema" para ver la lista.</div>
+          </div>
+          <div id="bloatResult" class="mono-out" style="min-height:30px"></div>
+        </div>
+
+        <!-- ── OPTIMIZACIÓN ── -->
+        <div class="sub-panel" id="sub-maint-optim" style="flex-direction:column;gap:14px">
+
+          <!-- Animaciones -->
+          <div class="maint-section">
+            <div class="maint-section-title">🎞️ Velocidad de animaciones</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-sm" data-anim="0">Desactivar (0x)</button>
+              <button class="btn btn-sm btn-primary" data-anim="0.5">Rápidas (0.5x)</button>
+              <button class="btn btn-sm" data-anim="1">Normal (1x)</button>
+              <button class="btn btn-sm" data-anim="2">Lentas (2x)</button>
+              <span id="animCurrentLabel" style="font-size:0.8rem;color:var(--text-3);margin-left:6px"></span>
+            </div>
+          </div>
+
+          <!-- Modo rendimiento -->
+          <div class="maint-section">
+            <div class="maint-section-title">⚡ Modo de rendimiento (root)</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" data-perf="performance">Máximo rendimiento</button>
+              <button class="btn btn-sm btn-primary" data-perf="balanced">Equilibrado</button>
+              <button class="btn btn-sm" data-perf="powersave">Ahorro batería</button>
+            </div>
+          </div>
+
+          <!-- Telemetría -->
+          <div class="maint-section">
+            <div class="maint-section-title">🔕 Reducir telemetría</div>
+            <p style="color:var(--text-2);font-size:0.83rem;margin-bottom:8px">Detiene servicios de diagnóstico y recopilación de datos.</p>
+            <button class="btn btn-sm btn-primary" id="btnDisableTelemetry">Reducir telemetría</button>
+          </div>
+
+          <!-- WiFi / BT / Avión -->
+          <div class="maint-section">
+            <div class="maint-section-title">📡 Conectividad rápida</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" data-toggle="wifi-on">WiFi ON</button>
+              <button class="btn btn-sm" data-toggle="wifi-off">WiFi OFF</button>
+              <button class="btn btn-sm" data-toggle="bt-on">Bluetooth ON</button>
+              <button class="btn btn-sm" data-toggle="bt-off">Bluetooth OFF</button>
+              <button class="btn btn-sm" data-toggle="air-on">Modo avión ON</button>
+              <button class="btn btn-sm" data-toggle="air-off">Modo avión OFF</button>
+            </div>
+          </div>
+
+          <div id="optimResult" class="mono-out" style="min-height:30px"></div>
+        </div>
+
+        <!-- ── SISTEMA ── -->
+        <div class="sub-panel" id="sub-maint-system" style="flex-direction:column;gap:14px">
+
+          <!-- Reloj -->
+          <div class="maint-section">
+            <div class="maint-section-title">🕐 Fecha y hora</div>
+            <p style="color:var(--text-2);font-size:0.83rem;margin-bottom:8px">Sincroniza la hora del dispositivo con el PC y activa la actualización automática.</p>
+            <button class="btn btn-sm btn-primary" id="btnFixClock">Sincronizar fecha y hora</button>
+          </div>
+
+          <!-- Opciones desarrollador -->
+          <div class="maint-section">
+            <div class="maint-section-title">🛠️ Opciones de desarrollador</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm btn-primary" id="btnDevOn">Activar</button>
+              <button class="btn btn-sm" id="btnDevOff">Desactivar</button>
+            </div>
+          </div>
+
+          <!-- Modo seguro -->
+          <div class="maint-section">
+            <div class="maint-section-title">🛡️ Modo seguro</div>
+            <p style="color:var(--text-2);font-size:0.83rem;margin-bottom:8px">Reinicia en modo seguro para diagnosticar apps problemáticas.</p>
+            <button class="btn btn-sm" id="btnSafeMode">Reiniciar en modo seguro</button>
+          </div>
+
+          <!-- Red -->
+          <div class="maint-section">
+            <div class="maint-section-title">🌐 Red</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+              <button class="btn btn-sm" id="btnResetNet">Restablecer red</button>
+              <button class="btn btn-sm" id="btnResetPwd">Restablecer política contraseñas</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <span style="font-size:0.83rem">DNS personalizado:</span>
+              <input class="input" id="dns1" placeholder="1.1.1.1" style="width:120px">
+              <input class="input" id="dns2" placeholder="1.0.0.1" style="width:120px">
+              <button class="btn btn-sm btn-primary" id="btnSetDns">Aplicar DNS</button>
+            </div>
+          </div>
+
+          <div id="systemResult" class="mono-out" style="min-height:30px"></div>
+        </div>
+
+        <!-- ── INFORME ── -->
+        <div class="sub-panel" id="sub-maint-report" style="flex-direction:column;gap:12px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-primary" id="btnGenReport">📋 Generar informe</button>
+            <button class="btn btn-sm" id="btnSnapshot">📸 Capturar estado actual</button>
+            <button class="btn btn-sm" id="btnCopyReport" style="display:none">📋 Copiar</button>
+          </div>
+          <div style="font-size:0.82rem;color:var(--text-3)">
+            El informe muestra el estado del dispositivo antes y después del mantenimiento. Útil para mostrar al cliente.
+          </div>
+          <div id="snapshotCompare" style="display:none;background:var(--bg-2);border-radius:8px;padding:12px;font-size:0.82rem"></div>
+          <pre id="maintReport" style="background:var(--bg-2);border-radius:8px;padding:14px;font-size:0.78rem;line-height:1.6;overflow:auto;max-height:400px;white-space:pre-wrap;display:none"></pre>
+        </div>
+
       </div>
 
       <!-- Terminal -->

@@ -821,6 +821,7 @@ function setupHandlers() {
   setupHwTests();
   setupCrm();
   setupAdbTerminal();
+  setupMaintenance();
   setupDriverButtons();
 }
 
@@ -2096,6 +2097,304 @@ function setupAdbTerminal() {
       btn.classList.add('active');
       document.getElementById('sub-' + btn.dataset.sub)?.classList.add('active');
     });
+  });
+}
+
+/* ===== MANTENIMIENTO ===== */
+function setupMaintenance() {
+  let _snapshot = null;
+  let _sysApps  = [];
+  let _reportTxt = '';
+
+  const serial = () => currentSerial;
+  const out = (id, msg, ok) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = ok === false ? 'var(--red)' : ok === true ? 'var(--green)' : 'var(--text2)';
+  };
+  const busy = (btnId, flag) => {
+    const b = document.getElementById(btnId);
+    if (b) b.disabled = flag;
+  };
+
+  /* helper: ejecutar con feedback */
+  async function run(btnId, resultId, fn) {
+    if (!serial()) { out(resultId, 'Conecta un dispositivo primero.', false); return; }
+    busy(btnId, true);
+    out(resultId, 'Ejecutando...', null);
+    try {
+      const r = await fn(serial());
+      out(resultId, r.msg || (r.ok ? 'OK' : 'Error'), r.ok !== false);
+    } catch (e) {
+      out(resultId, 'Error: ' + e.message, false);
+    }
+    busy(btnId, false);
+  }
+
+  /* ── LIMPIEZA ── */
+  document.getElementById('btnClearCache')?.addEventListener('click', () =>
+    run('btnClearCache', 'cleanResult', s => gsm.maint.clearAllCache(s)));
+
+  document.getElementById('btnClearTemp')?.addEventListener('click', () =>
+    run('btnClearTemp', 'cleanResult', s => gsm.maint.clearTemp(s)));
+
+  document.getElementById('btnClearLogs')?.addEventListener('click', () =>
+    run('btnClearLogs', 'cleanResult', s => gsm.maint.clearLogs(s)));
+
+  document.getElementById('btnResetBatt')?.addEventListener('click', () =>
+    run('btnResetBatt', 'cleanResult', s => gsm.maint.resetBattery(s)));
+
+  document.getElementById('btnClearDalvik')?.addEventListener('click', () =>
+    run('btnClearDalvik', 'cleanResult', s => gsm.maint.clearDalvik(s)));
+
+  document.getElementById('btnKillBg')?.addEventListener('click', () =>
+    run('btnKillBg', 'cleanResult', s => gsm.maint.killBg(s)));
+
+  /* ── BLOATWARE ── */
+  async function renderBloatList(apps) {
+    _sysApps = apps;
+    const list = document.getElementById('bloatList');
+    const search = (document.getElementById('bloatSearch')?.value || '').toLowerCase();
+    const filtered = search ? apps.filter(a => a.pkg.toLowerCase().includes(search)) : apps;
+    list.innerHTML = filtered.length ? filtered.map(a =>
+      `<div class="bloat-item ${a.disabled ? 'disabled' : ''}" data-pkg="${a.pkg}">
+        <input type="checkbox" ${a.disabled ? 'checked' : ''} data-pkg="${a.pkg}">
+        <span>${a.pkg}</span>
+        <span class="bloat-badge ${a.disabled ? 'dis' : 'sys'}">${a.disabled ? 'desactivada' : 'activa'}</span>
+      </div>`
+    ).join('') : '<div style="padding:10px;color:var(--text3);text-align:center">Sin resultados.</div>';
+    document.getElementById('bloatSearchWrap').style.display = '';
+  }
+
+  document.getElementById('btnLoadSysApps')?.addEventListener('click', async () => {
+    if (!serial()) { out('bloatResult', 'Conecta un dispositivo primero.', false); return; }
+    out('bloatResult', 'Cargando apps del sistema...', null);
+    try {
+      const apps = await gsm.maint.listSystemApps(serial());
+      await renderBloatList(apps);
+      out('bloatResult', `${apps.length} apps del sistema cargadas.`, true);
+    } catch (e) { out('bloatResult', 'Error: ' + e.message, false); }
+  });
+
+  document.getElementById('bloatSearch')?.addEventListener('input', () => {
+    if (_sysApps.length) renderBloatList(_sysApps);
+  });
+
+  document.getElementById('btnBloatPreset')?.addEventListener('click', async () => {
+    if (!serial()) { out('bloatResult', 'Conecta un dispositivo primero.', false); return; }
+    try {
+      const brand = await gsm.adb.shell(serial(), 'getprop ro.product.brand');
+      const res = await gsm.maint.bloatPreset(brand);
+      if (!_sysApps.length) {
+        const apps = await gsm.maint.listSystemApps(serial());
+        await renderBloatList(apps);
+      }
+      const presetSet = new Set(res.pkgs);
+      document.querySelectorAll('#bloatList .bloat-item input').forEach(cb => {
+        cb.checked = presetSet.has(cb.dataset.pkg);
+      });
+      out('bloatResult', `Preset ${brand}: ${res.pkgs.length} apps marcadas.`, true);
+    } catch (e) { out('bloatResult', 'Error: ' + e.message, false); }
+  });
+
+  document.getElementById('btnBatchDisable')?.addEventListener('click', async () => {
+    if (!serial()) { out('bloatResult', 'Conecta un dispositivo primero.', false); return; }
+    const pkgs = [...document.querySelectorAll('#bloatList .bloat-item input:checked')].map(cb => cb.dataset.pkg);
+    if (!pkgs.length) { out('bloatResult', 'Selecciona al menos una app.', false); return; }
+    out('bloatResult', `Desactivando ${pkgs.length} apps...`, null);
+    try {
+      const r = await gsm.maint.batchDisable(serial(), pkgs);
+      out('bloatResult', r.msg, r.ok);
+      if (r.ok) { const apps = await gsm.maint.listSystemApps(serial()); await renderBloatList(apps); }
+    } catch (e) { out('bloatResult', 'Error: ' + e.message, false); }
+  });
+
+  document.getElementById('btnBatchEnable')?.addEventListener('click', async () => {
+    if (!serial()) { out('bloatResult', 'Conecta un dispositivo primero.', false); return; }
+    const pkgs = [...document.querySelectorAll('#bloatList .bloat-item input:checked')].map(cb => cb.dataset.pkg);
+    if (!pkgs.length) { out('bloatResult', 'Selecciona al menos una app.', false); return; }
+    out('bloatResult', `Reactivando ${pkgs.length} apps...`, null);
+    try {
+      for (const pkg of pkgs) await gsm.maint.enableApp(serial(), pkg);
+      out('bloatResult', `${pkgs.length} apps reactivadas.`, true);
+      const apps = await gsm.maint.listSystemApps(serial()); await renderBloatList(apps);
+    } catch (e) { out('bloatResult', 'Error: ' + e.message, false); }
+  });
+
+  /* ── OPTIMIZACIÓN ── */
+  async function loadAnimScale() {
+    if (!serial()) return;
+    try {
+      const sc = await gsm.maint.getAnimations(serial());
+      document.getElementById('animCurrentLabel').textContent = `Actual: x${sc.window}`;
+    } catch (_) {}
+  }
+
+  document.querySelectorAll('[data-anim]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!serial()) { out('optimResult', 'Conecta un dispositivo primero.', false); return; }
+      const scale = parseFloat(btn.dataset.anim);
+      out('optimResult', 'Aplicando...', null);
+      try {
+        const r = await gsm.maint.setAnimations(serial(), scale);
+        out('optimResult', r.msg, r.ok);
+        await loadAnimScale();
+      } catch (e) { out('optimResult', 'Error: ' + e.message, false); }
+    });
+  });
+
+  document.querySelectorAll('[data-perf]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!serial()) { out('optimResult', 'Conecta un dispositivo primero.', false); return; }
+      out('optimResult', 'Aplicando modo ' + btn.dataset.perf + '...', null);
+      try {
+        const r = await gsm.maint.setPerfMode(serial(), btn.dataset.perf);
+        out('optimResult', r.msg, r.ok);
+      } catch (e) { out('optimResult', 'Error: ' + e.message, false); }
+    });
+  });
+
+  document.getElementById('btnDisableTelemetry')?.addEventListener('click', async () => {
+    if (!serial()) { out('optimResult', 'Conecta un dispositivo primero.', false); return; }
+    out('optimResult', 'Reduciendo telemetría...', null);
+    try {
+      const r = await gsm.maint.disableTelemetry(serial());
+      out('optimResult', r.msg, r.ok);
+    } catch (e) { out('optimResult', 'Error: ' + e.message, false); }
+  });
+
+  document.querySelectorAll('[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!serial()) { out('optimResult', 'Conecta un dispositivo primero.', false); return; }
+      const [type, state] = btn.dataset.toggle.split('-');
+      const on = state === 'on';
+      out('optimResult', 'Aplicando...', null);
+      try {
+        let r;
+        if (type === 'wifi') r = await gsm.maint.wifi(serial(), on);
+        else if (type === 'bt') r = await gsm.maint.bluetooth(serial(), on);
+        else if (type === 'air') r = await gsm.maint.airplane(serial(), on);
+        out('optimResult', r.msg, r.ok);
+      } catch (e) { out('optimResult', 'Error: ' + e.message, false); }
+    });
+  });
+
+  /* ── SISTEMA ── */
+  document.getElementById('btnFixClock')?.addEventListener('click', () =>
+    run('btnFixClock', 'systemResult', s => gsm.maint.fixClock(s)));
+
+  document.getElementById('btnDevOn')?.addEventListener('click', async () => {
+    if (!serial()) { out('systemResult', 'Conecta un dispositivo primero.', false); return; }
+    const r = await gsm.maint.devOptions(serial(), true);
+    out('systemResult', r.msg, r.ok);
+  });
+
+  document.getElementById('btnDevOff')?.addEventListener('click', async () => {
+    if (!serial()) { out('systemResult', 'Conecta un dispositivo primero.', false); return; }
+    const r = await gsm.maint.devOptions(serial(), false);
+    out('systemResult', r.msg, r.ok);
+  });
+
+  document.getElementById('btnSafeMode')?.addEventListener('click', async () => {
+    if (!serial()) { out('systemResult', 'Conecta un dispositivo primero.', false); return; }
+    if (!confirm('¿Reiniciar en modo seguro?')) return;
+    const r = await gsm.maint.safeMode(serial());
+    out('systemResult', r.msg, r.ok);
+  });
+
+  document.getElementById('btnResetNet')?.addEventListener('click', () =>
+    run('btnResetNet', 'systemResult', s => gsm.maint.resetNetwork(s)));
+
+  document.getElementById('btnResetPwd')?.addEventListener('click', () =>
+    run('btnResetPwd', 'systemResult', s => gsm.maint.resetPassword(s)));
+
+  document.getElementById('btnSetDns')?.addEventListener('click', async () => {
+    if (!serial()) { out('systemResult', 'Conecta un dispositivo primero.', false); return; }
+    const d1 = document.getElementById('dns1')?.value.trim() || '1.1.1.1';
+    const d2 = document.getElementById('dns2')?.value.trim() || '1.0.0.1';
+    const r = await gsm.maint.setDns(serial(), d1, d2);
+    out('systemResult', r.msg, r.ok);
+  });
+
+  /* ── INFORME ── */
+  document.getElementById('btnSnapshot')?.addEventListener('click', async () => {
+    if (!serial()) return;
+    try {
+      _snapshot = await gsm.maint.snapshot(serial());
+      const el = document.getElementById('snapshotCompare');
+      el.style.display = '';
+      el.innerHTML = `<strong>Snapshot capturado</strong> — ${new Date(_snapshot.ts).toLocaleTimeString()}<br>
+        Batería: ${_snapshot.battery}% · Apps usuario: ${_snapshot.userApps} · Desactivadas: ${_snapshot.disApps} · Animaciones: x${_snapshot.anim}`;
+    } catch (e) { console.error(e); }
+  });
+
+  document.getElementById('btnGenReport')?.addEventListener('click', async () => {
+    if (!serial()) { return; }
+    busy('btnGenReport', true);
+    try {
+      const r = await gsm.maint.report(serial());
+      _reportTxt = r.report;
+      const pre = document.getElementById('maintReport');
+      pre.textContent = _reportTxt;
+      pre.style.display = '';
+      document.getElementById('btnCopyReport').style.display = '';
+
+      if (_snapshot) {
+        const snap = document.getElementById('snapshotCompare');
+        snap.style.display = '';
+        snap.innerHTML += `<br><br><strong>Comparativa Antes → Ahora</strong><br>
+          Batería: ${_snapshot.battery}% → ${(r.report.match(/Batería\s+: (\d+)/) || ['','?'])[1]}%`;
+      }
+    } catch (e) { console.error(e); }
+    busy('btnGenReport', false);
+  });
+
+  document.getElementById('btnCopyReport')?.addEventListener('click', () => {
+    if (_reportTxt) navigator.clipboard.writeText(_reportTxt).then(() =>
+      out('maintReport', _reportTxt + '\n\n[Copiado al portapapeles]', null));
+  });
+
+  /* ── UN CLIC ── */
+  document.getElementById('maintRunFull')?.addEventListener('click', async () => {
+    if (!serial()) {
+      document.getElementById('maintFullResult').style.display = '';
+      document.getElementById('maintFullLog').innerHTML = '<span style="color:var(--red)">Conecta un dispositivo primero.</span>';
+      return;
+    }
+    busy('maintRunFull', true);
+    document.getElementById('maintFullResult').style.display = '';
+    document.getElementById('maintFullLog').innerHTML = '<span class="spinner"></span> Ejecutando...';
+
+    const opts = {
+      clearCache: document.getElementById('optCache')?.checked,
+      clearLogs:  document.getElementById('optLogs')?.checked,
+      clearTemp:  document.getElementById('optTemp')?.checked,
+      killBg:     document.getElementById('optKillBg')?.checked,
+      resetBatt:  document.getElementById('optBatt')?.checked,
+      fixClock:   document.getElementById('optClock')?.checked,
+      animations: document.getElementById('optAnim')?.checked,
+    };
+
+    try {
+      const r = await gsm.maint.runFull(serial(), opts);
+      const html = r.steps.map(s =>
+        `<div>${s.ok ? '✅' : '❌'} <b>${s.label}</b>${s.msg ? ' — ' + s.msg : ''}</div>`
+      ).join('');
+      document.getElementById('maintFullLog').innerHTML =
+        html + `<div style="margin-top:10px;font-weight:600;color:${r.ok ? 'var(--green)' : 'var(--text2)'}">
+          ${r.summary}</div>`;
+      term('Mantenimiento completo: ' + r.summary, 'ok');
+    } catch (e) {
+      document.getElementById('maintFullLog').innerHTML =
+        `<span style="color:var(--red)">Error: ${e.message}</span>`;
+    }
+    busy('maintRunFull', false);
+  });
+
+  /* cargar escala de animaciones al entrar al tab */
+  document.querySelector('[data-tab="maint"]')?.addEventListener('click', () => {
+    setTimeout(loadAnimScale, 300);
   });
 }
 

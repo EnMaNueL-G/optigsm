@@ -17,6 +17,7 @@ const advanced = require('./advanced');
 const copilot = require('./copilot');
 const crm = require('./crm');
 const license = require('./license');
+const maint = require('./maintenance');
 
 let mainWin = null;
 
@@ -360,3 +361,40 @@ ipcMain.handle('adb:logcatStop', () => {
   if (_logcatProc) { try { _logcatProc.kill(); } catch (_) {} _logcatProc = null; }
   return { ok: true };
 });
+
+/* ── MANTENIMIENTO ─────────────────────────────────────────────────────── */
+ipcMain.handle('maint:clearLogs',       (_, s)       => maint.clearSystemLogs(s));
+ipcMain.handle('maint:clearTemp',       (_, s)       => maint.clearTempFiles(s));
+ipcMain.handle('maint:clearAppCache',   (_, s, pkg)  => maint.clearAppCache(s, pkg));
+ipcMain.handle('maint:clearAllCache',   (_, s)       => maint.clearAllUserCache(s));
+ipcMain.handle('maint:clearDalvik',     (_, s)       => maint.clearDalvikCache(s));
+ipcMain.handle('maint:resetBattery',    (_, s)       => maint.resetBatteryStats(s));
+ipcMain.handle('maint:listSystemApps',  (_, s)       => maint.listSystemApps(s));
+ipcMain.handle('maint:listUserApps',    (_, s)       => maint.listUserApps(s));
+ipcMain.handle('maint:disableApp',      (_, s, pkg)  => maint.disableApp(s, pkg));
+ipcMain.handle('maint:enableApp',       (_, s, pkg)  => maint.enableApp(s, pkg));
+ipcMain.handle('maint:batchDisable',    (_, s, pkgs) => maint.batchDisable(s, pkgs));
+ipcMain.handle('maint:batchUninstall',  (_, s, pkgs) => maint.batchUninstall(s, pkgs));
+ipcMain.handle('maint:killBg',          (_, s)       => maint.killBackground(s));
+ipcMain.handle('maint:forceStop',       (_, s, pkg)  => maint.forceStopApp(s, pkg));
+ipcMain.handle('maint:runningApps',     (_, s)       => maint.getRunningApps(s));
+ipcMain.handle('maint:permissions',     (_, s, pkg)  => maint.getAppPermissions(s, pkg));
+ipcMain.handle('maint:revoke',          (_, s, pkg, perm) => maint.revokePermission(s, pkg, perm));
+ipcMain.handle('maint:grant',           (_, s, pkg, perm) => maint.grantPermission(s, pkg, perm));
+ipcMain.handle('maint:setAnimations',   (_, s, sc)   => maint.setAnimationScale(s, sc));
+ipcMain.handle('maint:getAnimations',   (_, s)       => maint.getAnimationScales(s));
+ipcMain.handle('maint:setPerfMode',     (_, s, mode) => maint.setPerformanceMode(s, mode));
+ipcMain.handle('maint:disableTelemetry',(_, s)       => maint.disableTelemetry(s));
+ipcMain.handle('maint:fixClock',        (_, s)       => maint.fixClock(s));
+ipcMain.handle('maint:wifi',            (_, s, on)   => maint.toggleWifi(s, on));
+ipcMain.handle('maint:bluetooth',       (_, s, on)   => maint.toggleBluetooth(s, on));
+ipcMain.handle('maint:airplane',        (_, s, on)   => maint.toggleAirplane(s, on));
+ipcMain.handle('maint:devOptions',      (_, s, on)   => on ? maint.enableDevOptions(s) : maint.disableDevOptions(s));
+ipcMain.handle('maint:safeMode',        (_, s)       => maint.rebootSafeMode(s));
+ipcMain.handle('maint:resetNetwork',    (_, s)       => maint.resetNetworkSettings(s));
+ipcMain.handle('maint:setDns',          (_, s, d1, d2) => maint.setCustomDns(s, d1, d2));
+ipcMain.handle('maint:resetPassword',   (_, s)       => maint.resetPasswordPolicy(s));
+ipcMain.handle('maint:report',          (_, s)       => maint.generateReport(s));
+ipcMain.handle('maint:snapshot',        (_, s)       => maint.takeSnapshot(s));
+ipcMain.handle('maint:bloatPreset',     (_, brand)   => ({ ok: true, pkgs: maint.getBloatwarePreset(brand) }));
+ipcMain.handle('maint:runFull',         (_, s, opts) => maint.runFullMaintenance(s, opts));
