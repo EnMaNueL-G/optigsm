@@ -31,7 +31,7 @@
 | **Qualcomm (EDL)** | Particiones, EFS, FRP, backup crítico |
 | **FRP Bypass** | 8 métodos automáticos según chip y Android |
 | **Test Hardware** | Pantalla, vibración, sensores, batería, cámara |
-| **Espejo (scrcpy)** | Ver y controlar el dispositivo en tiempo real |
+| **Espejo** | Ver y controlar el dispositivo en tiempo real desde el PC |
 | **Terminal ADB** | 80+ comandos en 9 categorías con sugerencias |
 | **Co-Pilot IA** | Asistente con IA local (Ollama / LM Studio) |
 | **CRM** | Clientes, historial de reparaciones, estadísticas |
@@ -50,7 +50,7 @@
 
 ## Características destacadas
 
-- **Sin instalación de dependencias complejas** — ADB incluido, scrcpy detectable automáticamente
+- **Sin instalación de dependencias complejas** — ADB incluido, Espejo disponible en 1 clic
 - **Co-Pilot IA 100% local** — pregunta sobre cualquier procedimiento sin enviar datos a la nube
 - **Compatible con TV Box** — conexión por WiFi ADB, cambio de launcher, instalar APKs, ajustar densidad
 - **CRM integrado** — registra clientes, reparaciones, fechas de entrega y genera estadísticas
