@@ -4,5 +4,10 @@ build/
 *.log
 .env
 userData/
-tools/adb.exe
-tools/fastboot.exe
+tools/
+assets/
+src/
+python/
+install.bat
+start.bat
+package-lock.json

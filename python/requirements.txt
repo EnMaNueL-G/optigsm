@@ -1,6 +1,0 @@
-mtkclient
-edlclient
-pyserial
-pyusb
-requests
-colorama
