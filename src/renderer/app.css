@@ -234,6 +234,52 @@ button, .btn { display: inline-flex; align-items: center; justify-content: cente
 .fw-tools { margin-top: 10px; }
 .fw-links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 
+/* ===== CO-PILOT IA ===== */
+#tab-copilot { gap: 10px; }
+.copilot-layout { display: flex; gap: 12px; flex: 1 1 0 !important; min-height: 0; overflow: hidden; }
+.copilot-sidebar { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.copilot-status { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; }
+.cp-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; }
+.cp-dot.ok { background: #56d364; }
+.cp-dot.err { background: var(--red-h); }
+.copilot-model-row { display: flex; gap: 4px; align-items: center; }
+.cp-select { flex: 1; font-size: 12px; }
+.copilot-device { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; font-size: 11px; }
+.cp-device-label { color: var(--text2); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.cp-device-val { font-family: var(--mono); color: var(--accent-h); line-height: 1.5; }
+.cp-section-label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 2px; }
+.cp-quick-btns { display: flex; flex-direction: column; gap: 4px; }
+.cp-quick-btn { text-align: left; padding: 7px 10px; font-size: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); cursor: pointer; transition: border-color 0.12s; }
+.cp-quick-btn:hover { border-color: var(--accent); color: var(--accent-h); }
+.cp-clear { font-size: 12px; margin-top: auto; }
+.copilot-chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.cp-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.cp-msg { display: flex; flex-direction: column; gap: 3px; }
+.cp-msg-user { align-items: flex-end; }
+.cp-msg-assistant { align-items: flex-start; }
+.cp-msg-system { align-items: center; }
+.cp-bubble { max-width: 85%; padding: 9px 13px; border-radius: 10px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.cp-msg-user .cp-bubble { background: var(--accent); color: #fff; }
+.cp-msg-assistant .cp-bubble { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+.cp-msg-system .cp-bubble { background: transparent; color: var(--text2); font-size: 12px; font-style: italic; }
+.cp-bubble code { background: rgba(0,0,0,0.25); padding: 1px 4px; border-radius: 3px; font-family: var(--mono); font-size: 11px; }
+.cp-bubble pre { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
+.cp-bubble pre code { background: none; padding: 0; }
+.cp-role-label { font-size: 10px; color: var(--text2); padding: 0 4px; }
+.cp-composer { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); }
+.cp-input { flex: 1; resize: none; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 8px 10px; font-size: 13px; font-family: inherit; }
+.cp-input:focus { outline: none; border-color: var(--accent); }
+.cp-send { align-self: flex-end; }
+.cp-streaming .cp-bubble::after { content: '▌'; animation: blink 0.7s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ===== HISTORIAL ===== */
+.hist-item { display: flex; gap: 12px; padding: 9px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; align-items: center; }
+.hist-ts { color: var(--text2); min-width: 130px; font-family: var(--mono); font-size: 11px; }
+.hist-platform { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(31,111,235,0.15); color: var(--accent-h); font-weight: 600; flex-shrink: 0; }
+.hist-op { flex: 1; font-size: 12px; }
+.hist-model { color: var(--text2); font-family: var(--mono); font-size: 11px; }
+
 /* ===== SUB TABS ===== */
 .tabs-sub { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
 .tab-sub { padding: 6px 16px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text2); cursor: pointer; font-size: 13px; margin-bottom: -1px; }

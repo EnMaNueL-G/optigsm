@@ -51,6 +51,7 @@
       </div>
       <div class="nav-section">
         <div class="nav-label">SISTEMA</div>
+        <button class="nav-item" data-tab="copilot">🤖 Co-Pilot IA</button>
         <button class="nav-item" data-tab="advanced" id="navAdvanced">🔒 Avanzado</button>
         <button class="nav-item" data-tab="history">📋 Historial</button>
         <button class="nav-item" data-tab="settings">⚙️ Ajustes</button>
@@ -118,6 +119,7 @@
           <button class="btn" id="btnBattery">🔋 Batería</button>
           <button class="btn" id="btnStorageInfo">💾 Almacenamiento</button>
           <button class="btn" id="btnReadImei">🔢 Leer IMEI</button>
+          <button class="btn" id="btnSecurity">🔒 Knox/Widevine</button>
         </div>
         <div class="info-table" id="infoTable"></div>
       </div>
@@ -482,13 +484,53 @@
         </div>
       </div>
 
+      <!-- CO-PILOT IA -->
+      <div class="tab-panel" id="tab-copilot">
+        <h2 class="panel-title">🤖 Co-Pilot IA</h2>
+        <div class="copilot-layout">
+          <!-- Sidebar izquierdo -->
+          <div class="copilot-sidebar">
+            <div class="copilot-status" id="copilotStatus">
+              <span class="cp-dot" id="cpDot"></span>
+              <span id="cpStatusLabel">Verificando IA...</span>
+            </div>
+            <div class="copilot-model-row">
+              <select class="input cp-select" id="cpModel">
+                <option value="">Detectando modelos...</option>
+              </select>
+              <button class="btn btn-xs" id="cpRefreshModels" title="Actualizar modelos">↻</button>
+            </div>
+            <div class="copilot-device" id="cpDeviceCtx">
+              <div class="cp-device-label">Dispositivo conectado</div>
+              <div id="cpDeviceInfo" class="cp-device-val">—</div>
+            </div>
+            <div class="cp-section-label">Acciones rápidas</div>
+            <div class="cp-quick-btns" id="cpQuickBtns"></div>
+            <button class="btn btn-sm cp-clear" id="cpClear">🗑 Limpiar chat</button>
+          </div>
+          <!-- Chat principal -->
+          <div class="copilot-chat">
+            <div class="cp-messages" id="cpMessages">
+              <div class="cp-msg cp-msg-system">
+                <div class="cp-bubble">Hola, soy el Co-Pilot de OptiGSM. Conéctame a Ollama o LM Studio y pregúntame sobre cualquier procedimiento de reparación.</div>
+              </div>
+            </div>
+            <div class="cp-composer">
+              <textarea class="cp-input" id="cpInput" placeholder="Escribe tu pregunta de reparación..." rows="2"></textarea>
+              <button class="btn btn-primary cp-send" id="cpSend">Enviar ↵</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- HISTORY -->
       <div class="tab-panel" id="tab-history">
         <h2 class="panel-title">Historial de operaciones</h2>
         <div class="btn-row">
-          <button class="btn btn-primary" id="histRefresh">Actualizar</button>
+          <button class="btn btn-primary" id="histRefresh">↻ Actualizar</button>
+          <button class="btn" id="histClear">🗑 Limpiar</button>
         </div>
-        <div class="history-list" id="historyList"></div>
+        <div id="historyList" class="history-list"></div>
       </div>
 
       <!-- SETTINGS -->

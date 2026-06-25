@@ -17,6 +17,11 @@ contextBridge.exposeInMainWorld('gsm', {
   // ADB operations
   adb: {
     shell: (serial, cmd) => ipcRenderer.invoke('adb:shell', serial, cmd),
+    security: (serial) => ipcRenderer.invoke('adb:security', serial),
+    buildpropRead: (serial) => ipcRenderer.invoke('adb:buildpropRead', serial),
+    buildpropWrite: (serial, key, val) => ipcRenderer.invoke('adb:buildpropWrite', serial, key, val),
+    changeMac: (serial, mac) => ipcRenderer.invoke('adb:changeMac', serial, mac),
+    cscInfo: (serial) => ipcRenderer.invoke('adb:cscInfo', serial),
     install: (serial, apkPath, opts) => ipcRenderer.invoke('adb:install', serial, apkPath, opts),
     uninstall: (serial, pkg, keepData) => ipcRenderer.invoke('adb:uninstall', serial, pkg, keepData),
     packages: (serial, flags) => ipcRenderer.invoke('adb:packages', serial, flags),
@@ -87,6 +92,7 @@ contextBridge.exposeInMainWorld('gsm', {
     info: (serial) => ipcRenderer.invoke('samsung:info', serial),
     rebootToDownload: (serial) => ipcRenderer.invoke('samsung:rebootToDownload', serial),
     searchFw: (model, region) => ipcRenderer.invoke('samsung:searchFw', model, region),
+    changeCsc: (serial, csc) => ipcRenderer.invoke('samsung:changeCsc', serial, csc),
   },
 
   // FRP
@@ -116,6 +122,14 @@ contextBridge.exposeInMainWorld('gsm', {
     huaweiIdRemove: (serial) => ipcRenderer.invoke('advanced:huaweiIdRemove', serial),
     mtkFrpBypass: () => ipcRenderer.invoke('advanced:mtkFrpBypass'),
     qcFrpBypass: () => ipcRenderer.invoke('advanced:qcFrpBypass'),
+  },
+
+  // Co-Pilot IA
+  copilot: {
+    check: () => ipcRenderer.invoke('copilot:check'),
+    models: () => ipcRenderer.invoke('copilot:models'),
+    prompts: () => ipcRenderer.invoke('copilot:prompts'),
+    chat: (opts) => ipcRenderer.invoke('copilot:chat', opts),
   },
 
   // History

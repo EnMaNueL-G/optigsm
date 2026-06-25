@@ -81,6 +81,7 @@ function onTabOpen(tab) {
   if (tab === 'advanced') checkAdvanced();
   if (tab === 'fastboot') fbScan();
   if (tab === 'support') loadSupportInfo();
+  if (tab === 'copilot') initCopilot();
 }
 
 function loadSupportInfo() {
@@ -740,6 +741,27 @@ function setupHandlers() {
   };
   document.getElementById('depCheck').onclick = checkDeps;
   document.getElementById('histRefresh').onclick = loadHistory;
+  document.getElementById('histClear').onclick = async () => {
+    if (!confirm('¿Borrar todo el historial de operaciones?')) return;
+    await gsm.history.log({ _clear: true }); loadHistory();
+  };
+  document.getElementById('btnSecurity').onclick = async () => {
+    const s = needDevice(); if (!s) return;
+    term('Leyendo Knox / Widevine / seguridad...', 'info');
+    const r = await gsm.adb.security(s);
+    if (!r.ok) { term(r.out || 'Error leyendo seguridad', 'err'); return; }
+    const table = document.getElementById('infoTable');
+    const rows = Object.entries(r.data || {}).map(([k, v]) => `
+      <div class="info-row"><span class="key">${escHtml(k)}</span><span class="val">${escHtml(String(v))}</span></div>`).join('');
+    table.innerHTML = `<div class="info-section"><div class="info-section-title">🔒 Knox / Widevine / Seguridad</div>${rows}</div>`;
+    term('Seguridad leída', 'ok');
+  };
+  document.getElementById('cpSend') && (document.getElementById('cpSend').onclick = copilotSend);
+  document.getElementById('cpClear') && (document.getElementById('cpClear').onclick = copilotClear);
+  document.getElementById('cpRefreshModels') && (document.getElementById('cpRefreshModels').onclick = copilotLoadModels);
+  document.getElementById('cpInput') && (document.getElementById('cpInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); copilotSend(); }
+  }));
   document.getElementById('btnScan') && (document.getElementById('btnScan').onclick = scanDevices);
   document.getElementById('btnSettings').onclick = () => clickNav('settings');
 }
@@ -896,17 +918,160 @@ async function checkDeps() {
 
 /* ===== HISTORY ===== */
 async function loadHistory() {
-  const ops = await gsm.history.get(100);
+  const ops = await gsm.history.get(150);
   const list = document.getElementById('historyList');
-  if (!ops || !ops.length) { list.innerHTML = '<div class="empty-state" style="padding:20px">Sin operaciones registradas</div>'; return; }
-  list.innerHTML = ops.map(op => `
-    <div class="hist-item">
-      <span class="hist-ts">${new Date(op.ts).toLocaleString('es-ES')}</span>
-      <span class="hist-op">${op.operation || '—'}</span>
-      <span class="hist-detail">${[op.platform, op.model, op.imei].filter(Boolean).join(' · ')}</span>
-      <span class="hist-detail">${op.result || ''}</span>
-    </div>
-  `).join('');
+  if (!ops || !ops.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:20px;color:var(--text2)">Sin operaciones registradas</div>';
+    return;
+  }
+  list.innerHTML = ops.slice().reverse().map(op => {
+    const ts = op.ts ? new Date(op.ts).toLocaleString('es-ES') : '—';
+    const platform = op.platform || '';
+    const model = op.model || '';
+    const operation = op.operation || '—';
+    const detail = [model, op.imei].filter(Boolean).join(' · ');
+    const resultIcon = op.result === 'ok' ? '✓' : op.result === 'err' ? '✗' : '';
+    return `<div class="hist-item">
+      <span class="hist-ts">${escHtml(ts)}</span>
+      ${platform ? `<span class="hist-platform">${escHtml(platform)}</span>` : ''}
+      <span class="hist-op">${resultIcon ? '<span style="color:' + (op.result==='ok'?'#56d364':'var(--red-h)') + '">' + resultIcon + '</span> ' : ''}${escHtml(operation)}</span>
+      ${detail ? `<span class="hist-model">${escHtml(detail)}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ===== CO-PILOT IA ===== */
+let cpMessages = [];
+let cpDeviceInfo = null;
+let cpInitialized = false;
+
+async function initCopilot() {
+  if (cpInitialized) { updateCpDeviceCtx(); return; }
+  cpInitialized = true;
+  updateCpDeviceCtx();
+  await copilotCheckBackend();
+  await copilotLoadModels();
+  await copilotLoadQuickBtns();
+}
+
+function updateCpDeviceCtx() {
+  const el = document.getElementById('cpDeviceInfo');
+  if (!el) return;
+  if (selectedDevice) {
+    cpDeviceInfo = selectedDevice;
+    el.textContent = `${selectedDevice.model || selectedDevice.serial}\n${selectedDevice.brand || ''} · Android ${selectedDevice.android || '?'}`;
+  } else {
+    cpDeviceInfo = null;
+    el.textContent = '— Sin dispositivo —';
+  }
+}
+
+async function copilotCheckBackend() {
+  const dot = document.getElementById('cpDot');
+  const label = document.getElementById('cpStatusLabel');
+  if (!dot || !label) return;
+  label.textContent = 'Verificando...';
+  dot.className = 'cp-dot';
+  const r = await gsm.copilot.check().catch(() => ({ any: false }));
+  if (r.any) {
+    dot.className = 'cp-dot ok';
+    const parts = [];
+    if (r.ollama) parts.push('Ollama');
+    if (r.lmstudio) parts.push('LM Studio');
+    label.textContent = parts.join(' + ') + ' ✓';
+  } else {
+    dot.className = 'cp-dot err';
+    label.textContent = 'Sin IA local';
+  }
+}
+
+async function copilotLoadModels() {
+  const sel = document.getElementById('cpModel');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Cargando...</option>';
+  const models = await gsm.copilot.models().catch(() => []);
+  if (!models.length) {
+    sel.innerHTML = '<option value="">Sin modelos (abre Ollama/LM Studio)</option>';
+    return;
+  }
+  sel.innerHTML = models.map(m => `<option value="${escHtml(m.id)}" data-backend="${m.backend}">${escHtml(m.name)} [${m.backend}]</option>`).join('');
+}
+
+async function copilotLoadQuickBtns() {
+  const container = document.getElementById('cpQuickBtns');
+  if (!container) return;
+  const prompts = await gsm.copilot.prompts().catch(() => []);
+  container.innerHTML = prompts.map(p => `<button class="cp-quick-btn" data-prompt="${escHtml(p.prompt)}">${escHtml(p.label)}</button>`).join('');
+  container.querySelectorAll('.cp-quick-btn').forEach(btn => {
+    btn.onclick = () => {
+      const input = document.getElementById('cpInput');
+      if (input) { input.value = btn.dataset.prompt; copilotSend(); }
+    };
+  });
+}
+
+function cpAddMessage(role, text, streaming = false) {
+  const msgs = document.getElementById('cpMessages');
+  if (!msgs) return null;
+  const div = document.createElement('div');
+  div.className = `cp-msg cp-msg-${role}${streaming ? ' cp-streaming' : ''}`;
+  const label = role === 'user' ? 'Tú' : role === 'assistant' ? 'Co-Pilot' : '';
+  div.innerHTML = `${label ? `<span class="cp-role-label">${label}</span>` : ''}<div class="cp-bubble">${escHtml(text)}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function cpUpdateBubble(div, text) {
+  const bubble = div && div.querySelector('.cp-bubble');
+  if (bubble) bubble.innerHTML = escHtml(text).replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>').replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+let _cpSending = false;
+async function copilotSend() {
+  if (_cpSending) return;
+  const input = document.getElementById('cpInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const sel = document.getElementById('cpModel');
+  const model = sel ? sel.value : '';
+  const selOpt = sel && sel.selectedOptions[0];
+  const backend = selOpt ? selOpt.dataset.backend : undefined;
+
+  cpMessages.push({ role: 'user', content: text });
+  cpAddMessage('user', text);
+
+  const assistDiv = cpAddMessage('assistant', '...', true);
+  const sendBtn = document.getElementById('cpSend');
+  if (sendBtn) sendBtn.disabled = true;
+  _cpSending = true;
+
+  const r = await gsm.copilot.chat({
+    messages: cpMessages,
+    model: model || undefined,
+    backend: backend || undefined,
+    deviceInfo: cpDeviceInfo,
+  }).catch(e => ({ ok: false, out: e.message }));
+
+  _cpSending = false;
+  if (sendBtn) sendBtn.disabled = false;
+  assistDiv.classList.remove('cp-streaming');
+
+  const finalText = r.out || (r.ok ? '(sin respuesta)' : 'No se pudo conectar con el modelo. Verifica que Ollama o LM Studio esté activo y tengas un modelo cargado.');
+  cpUpdateBubble(assistDiv, finalText);
+  const msgs = document.getElementById('cpMessages');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  if (r.ok && r.out) cpMessages.push({ role: 'assistant', content: r.out });
+  else if (!r.ok) term('Co-Pilot error: ' + finalText, 'err');
+}
+
+function copilotClear() {
+  cpMessages = [];
+  const msgs = document.getElementById('cpMessages');
+  if (msgs) msgs.innerHTML = '<div class="cp-msg cp-msg-system"><div class="cp-bubble">Chat limpiado. Haz una pregunta técnica sobre tu reparación.</div></div>';
 }
 
 /* ===== NAV HELPER ===== */

@@ -349,6 +349,81 @@ async function adbClearData(serial, pkg) {
   return adbShell(serial, `pm clear ${pkg}`);
 }
 
+// ── Seguridad: Knox, Widevine, bootloader ──────────────────────────────────
+async function adbSecurityInfo(serial) {
+  const [knox, wvRaw, blState, oemUnlock, verBoot, selinux, dm] = await Promise.all([
+    adbShell(serial, 'getprop ro.boot.warranty_bit 2>/dev/null || getprop ro.warranty_bit 2>/dev/null', 4000).catch(()=>({out:''})),
+    adbShell(serial, 'dumpsys drm 2>/dev/null | grep -i "widevine\\|security level" | head -5', 5000).catch(()=>({out:''})),
+    adbShell(serial, 'getprop ro.secureboot.lockstate 2>/dev/null || getprop ro.boot.verifiedbootstate 2>/dev/null', 4000).catch(()=>({out:''})),
+    adbShell(serial, 'getprop sys.oem_unlock_allowed 2>/dev/null || getprop ro.oem_unlock_supported 2>/dev/null', 4000).catch(()=>({out:''})),
+    adbShell(serial, 'getprop ro.boot.verifiedbootstate 2>/dev/null', 4000).catch(()=>({out:''})),
+    adbShell(serial, 'getprop ro.boot.selinux 2>/dev/null || getenforce 2>/dev/null', 4000).catch(()=>({out:''})),
+    adbShell(serial, 'getprop ro.crypto.state 2>/dev/null', 4000).catch(()=>({out:''})),
+  ]);
+  const knoxBit = (knox.out.trim() || '0');
+  const knoxStr = knoxBit === '0' ? 'Clean (0) ✓' : knoxBit === '1' ? 'Tripped (1) ⚠' : knoxBit;
+  // Widevine level
+  const wvText = wvRaw.out || '';
+  const wvLevel = /l1/i.test(wvText) ? 'L1 (HD/4K) ✓' : /l3/i.test(wvText) ? 'L3 (SD solamente)' : /l2/i.test(wvText) ? 'L2' : '(no detectado)';
+  const blStr = (blState.out.trim() || verBoot.out.trim() || '?');
+  return {
+    'Knox Warranty Bit': knoxStr,
+    'Widevine': wvLevel,
+    'Bootloader': blStr === 'locked' ? 'Bloqueado ✓' : blStr === 'unlocked' ? 'Desbloqueado ⚠' : blStr,
+    'OEM Unlock': oemUnlock.out.trim() === '1' ? 'Permitido' : oemUnlock.out.trim() === '0' ? 'No permitido' : oemUnlock.out.trim() || '?',
+    'SELinux': selinux.out.trim() || '?',
+    'Cifrado': dm.out.trim() || '?',
+  };
+}
+
+// ── Build.prop ─────────────────────────────────────────────────────────────
+async function adbBuildPropRead(serial) {
+  const r = await adbShell(serial, "su -c 'cat /system/build.prop 2>/dev/null || cat /system_ext/build.prop 2>/dev/null' 2>/dev/null", 8000);
+  if (!r.out || r.out.length < 50) {
+    const r2 = await adbShell(serial, 'getprop 2>/dev/null', 8000);
+    // Convert getprop [key]: [value] to key=value format
+    const lines = r2.out.split('\n').filter(l => l.includes(']:'));
+    return lines.map(l => {
+      const m = l.match(/\[([^\]]+)\]:\s*\[([^\]]*)\]/);
+      return m ? `${m[1]}=${m[2]}` : l;
+    }).join('\n');
+  }
+  return r.out;
+}
+
+async function adbBuildPropWrite(serial, key, value) {
+  const escaped = value.replace(/'/g, "\\'");
+  const r = await adbShell(serial,
+    `su -c 'mount -o remount,rw /system 2>/dev/null; sed -i "s|^${key}=.*|${key}=${escaped}|" /system/build.prop && grep "^${key}=" /system/build.prop'`,
+    10000);
+  if (!r.out.includes(key)) {
+    // Try setprop as fallback (volatile, lost on reboot)
+    const r2 = await adbShell(serial, `su -c 'setprop ${key} "${escaped}"'`, 5000);
+    return { ok: r2.ok, out: `Propiedad establecida (volatil, hasta reinicio): ${key}=${value}\nPara permanente: remonta /system con permisos de escritura.` };
+  }
+  return { ok: true, out: `✓ ${key}=${value}` };
+}
+
+// ── MAC address ────────────────────────────────────────────────────────────
+async function adbChangeMac(serial, newMac) {
+  const mac = newMac || Array.from({length:6}, () => Math.floor(Math.random()*256).toString(16).padStart(2,'0')).join(':');
+  const iface = 'wlan0';
+  const r = await adbShell(serial,
+    `su -c 'ip link set ${iface} down 2>/dev/null && ip link set ${iface} address ${mac} 2>/dev/null && ip link set ${iface} up 2>/dev/null && ip link show ${iface} | grep link/ether'`,
+    10000);
+  return { ok: r.ok, out: `MAC WiFi (${iface}): ${mac}\n${r.out}\nNota: El cambio es volátil y se revierte al reiniciar.` };
+}
+
+// ── CSC info ───────────────────────────────────────────────────────────────
+async function adbCscInfo(serial) {
+  const [csc, region, sales] = await Promise.all([
+    adbShell(serial, 'getprop ro.csc.country_code 2>/dev/null || getprop ro.csc.home_csc_country_code 2>/dev/null', 4000).catch(()=>({out:''})),
+    adbShell(serial, 'getprop ro.product.locale 2>/dev/null', 4000).catch(()=>({out:''})),
+    adbShell(serial, 'getprop ro.csc.sales_code 2>/dev/null', 4000).catch(()=>({out:''})),
+  ]);
+  return { cscCountry: csc.out.trim(), locale: region.out.trim(), salesCode: sales.out.trim() };
+}
+
 async function adbSensors(serial) {
   const r = await adbShell(serial, 'dumpsys sensorservice 2>/dev/null | grep "Sensor" | head -30');
   return r.out;
@@ -438,6 +513,7 @@ module.exports = {
   adbPull, adbPush, adbScreenshot, adbScreenRecord, adbLogcat,
   adbBackup, adbReboot, adbEnableDebugging, adbWifi, adbWifiConnect,
   adbBatteryInfo, adbStorageInfo, adbSensors, adbTestDisplay, adbWipeData, adbSideload,
+  adbSecurityInfo, adbBuildPropRead, adbBuildPropWrite, adbChangeMac, adbCscInfo,
   // FASTBOOT
   fastbootDevices, fastbootGetvar, fastbootInfo,
   fastbootFlash, fastbootErase, fastbootReboot,

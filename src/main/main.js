@@ -14,6 +14,7 @@ const samsung = require('./samsung');
 const frp = require('./frp');
 const firmware = require('./firmware');
 const advanced = require('./advanced');
+const copilot = require('./copilot');
 
 let mainWin = null;
 
@@ -239,4 +240,30 @@ ipcMain.handle('dialog:saveFile', async (_, opts) => {
     filters: (opts && opts.filters) || [{ name: 'All Files', extensions: ['*'] }],
   });
   return r.canceled ? null : r.filePath;
+});
+
+/* ===== Security / Knox / Widevine ===== */
+ipcMain.handle('adb:security', async (_, serial) => {
+  const data = await adb.adbSecurityInfo(serial).catch(e => null);
+  if (!data) return { ok: false, out: 'Error leyendo seguridad', data: {} };
+  return { ok: true, data };
+});
+
+/* ===== Build.prop ===== */
+ipcMain.handle('adb:buildpropRead', async (_, serial) => ({ ok: true, out: await adb.adbBuildPropRead(serial) }));
+ipcMain.handle('adb:buildpropWrite', async (_, serial, key, value) => adb.adbBuildPropWrite(serial, key, value));
+
+/* ===== MAC change ===== */
+ipcMain.handle('adb:changeMac', async (_, serial, mac) => adb.adbChangeMac(serial, mac));
+
+/* ===== CSC info & changer ===== */
+ipcMain.handle('adb:cscInfo', async (_, serial) => adb.adbCscInfo(serial));
+ipcMain.handle('samsung:changeCsc', async (_, serial, csc) => samsung.changeCsc(serial, csc));
+
+/* ===== Co-Pilot IA ===== */
+ipcMain.handle('copilot:check', async () => copilot.detectBackends());
+ipcMain.handle('copilot:models', async () => copilot.listModels());
+ipcMain.handle('copilot:prompts', async () => copilot.QUICK_PROMPTS);
+ipcMain.handle('copilot:chat', async (_, opts) => {
+  return copilot.chat(opts, (token) => sendStream(token));
 });

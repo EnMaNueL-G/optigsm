@@ -97,11 +97,23 @@ async function getInstalledCsc(serial) {
   return r2.out.trim();
 }
 
-// Change CSC via ADB (keeps data!)
+// Change CSC via ADB with multiple methods
 async function changeCsc(serial, newCsc) {
   const { adbShell } = require('./adb');
-  const r = await adbShell(serial, `csc-reset ${newCsc} 2>/dev/null || echo "CSC change requires root or download mode"`);
-  return r;
+  const csc = (newCsc || '').toUpperCase().trim();
+  if (!csc.match(/^[A-Z]{3}$/)) return { ok: false, out: 'CSC debe ser 3 letras (ej: EEA, ZTO, DBT, XEC).' };
+  // Method 1: Samsung CSC reset (Android 9-12, root)
+  const r1 = await adbShell(serial, `su -c 'csc-reset ${csc} 2>/dev/null'`, 6000).catch(()=>({out:''}));
+  if (r1.ok && r1.out.includes('reset')) return { ok: true, out: `CSC cambiado a ${csc}. Reinicia el dispositivo.` };
+  // Method 2: Write CSC to EFS (root, Samsung EFS path)
+  const r2 = await adbShell(serial, `su -c 'echo ${csc} > /efs/imei/mps_code.dat && sync && cat /efs/imei/mps_code.dat'`, 5000).catch(()=>({out:''}));
+  if (r2.out.trim() === csc) return { ok: true, out: `CSC escrito en EFS (/efs/imei/mps_code.dat): ${csc}\nReinicia para aplicar.` };
+  // Method 3: CSC via settings
+  const r3 = await adbShell(serial, `su -c 'settings put global csc_pref_country_iso ${csc.toLowerCase()} 2>/dev/null'`, 5000).catch(()=>({out:''}));
+  return {
+    ok: false,
+    out: `El cambio de CSC en este modelo requiere:\n1. Modo Download → flashing CSC package con Odin/Heimdall\n2. Root con EFS access\n\nCSC objetivo: ${csc}\nCSC actual: consulta "Leer Info Samsung" arriba.\n\nMétodos intentados: csc-reset, EFS write, settings — ninguno disponible sin privilegios.`,
+  };
 }
 
 /* ===== Samsung-specific ADB operations ===== */
