@@ -124,6 +124,20 @@ contextBridge.exposeInMainWorld('gsm', {
     qcFrpBypass: () => ipcRenderer.invoke('advanced:qcFrpBypass'),
   },
 
+  // Mirror (scrcpy)
+  mirror: {
+    start: (serial, opts) => ipcRenderer.invoke('mirror:start', serial, opts),
+    stop: () => ipcRenderer.invoke('mirror:stop'),
+  },
+
+  // Licencia
+  license: {
+    check: () => ipcRenderer.invoke('license:check'),
+    grace: () => ipcRenderer.invoke('license:grace'),
+    activate: (key) => ipcRenderer.invoke('license:activate', key),
+    deactivate: () => ipcRenderer.invoke('license:deactivate'),
+  },
+
   // Co-Pilot IA
   copilot: {
     check: () => ipcRenderer.invoke('copilot:check'),

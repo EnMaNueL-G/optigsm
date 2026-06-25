@@ -22,8 +22,10 @@ async function init() {
   setupNav();
   setupDeviceEvents();
   setupHandlers();
+  setupLicense();
   loadFrpMethods();
   await scanDevices();
+  await checkLicenseGate();
   term('OptiGSM iniciado', 'info');
 }
 
@@ -321,6 +323,7 @@ function setupHandlers() {
     term('Leyendo almacenamiento...', 'info');
     const r = await gsm.adb.storage(s); showResult(r);
   };
+  document.getElementById('qaMirror').onclick = () => launchMirror();
 
   // Info tab
   document.getElementById('btnGetInfo').onclick = async () => {
@@ -1157,10 +1160,14 @@ async function copilotSend() {
   const assistDiv = cpAddMessage('assistant', '', true);
   const sendBtn = document.getElementById('cpSend');
   const stopBtn = document.getElementById('cpStop');
-  const tpsEl  = document.getElementById('cpTps');
+  const tpsEl   = document.getElementById('cpTps');
+  const cpProg  = document.getElementById('cpProgress');
+  const cpProgLbl = document.getElementById('cpProgressLabel');
   if (sendBtn) sendBtn.disabled = true;
   if (stopBtn) stopBtn.style.display = '';
-  if (tpsEl)  tpsEl.textContent = 'Conectando...';
+  if (tpsEl)  tpsEl.textContent = '';
+  if (cpProg) { cpProg.style.display = ''; }
+  if (cpProgLbl) cpProgLbl.textContent = 'Conectando con el modelo...';
   _cpSending = true;
 
   let streamBuffer = '';
@@ -1170,8 +1177,12 @@ async function copilotSend() {
 
   gsm.copilot.offToken();
   gsm.copilot.onToken((token) => {
+    if (!streamBuffer) {
+      if (cpProgLbl) cpProgLbl.textContent = 'Generando respuesta...';
+    }
     streamBuffer += token;
     tokenCount++;
+    if (streamBuffer.length > 30 && cpProg) cpProg.style.display = 'none';
     cpUpdateBubble(assistDiv, streamBuffer);
     const msgs = document.getElementById('cpMessages');
     if (msgs) msgs.scrollTop = msgs.scrollHeight;
@@ -1192,6 +1203,7 @@ async function copilotSend() {
   gsm.copilot.offToken();
   clearTimeout(tpsTimer);
   _cpSending = false;
+  if (cpProg) cpProg.style.display = 'none';
   if (sendBtn) sendBtn.disabled = false;
   if (stopBtn) stopBtn.style.display = 'none';
   if (tpsEl && tokenCount) {
@@ -1212,6 +1224,115 @@ function copilotClear() {
   cpMessages = [];
   const msgs = document.getElementById('cpMessages');
   if (msgs) msgs.innerHTML = '<div class="cp-msg cp-msg-system"><div class="cp-bubble">Chat limpiado. Haz una pregunta técnica sobre tu reparación.</div></div>';
+}
+
+/* ===== MIRROR (scrcpy) ===== */
+async function launchMirror(serialOverride) {
+  const s = serialOverride || (selectedDevice && selectedDevice.serial);
+  if (!s) { term('Conecta un dispositivo primero.', 'warn'); return; }
+  term(`Iniciando espejo para ${s}...`, 'info');
+  const r = await gsm.mirror.start(s, { noControl: false, noAudio: true });
+  if (r.ok) {
+    term('Espejo activo en ventana separada. Ciérrala para detener.', 'ok');
+  } else {
+    term(r.out, 'err');
+    showResult(r);
+  }
+}
+
+/* ===== LICENCIA ===== */
+function licStatusHtml(lic, grace) {
+  if (lic.status === 'active') {
+    const exp = lic.expiry ? new Date(lic.expiry).toLocaleDateString('es-ES') : '—';
+    return `<div class="lic-status ok">✅ Licencia activa — ${lic.plan || 'PRO'} · Vence: ${exp}${lic.email ? ' · ' + lic.email : ''}</div>`;
+  }
+  if (lic.status === 'expired') return `<div class="lic-status err">❌ Licencia expirada. Renueva en optisuite.app/optigsm</div>`;
+  if (grace && grace.inGrace) return `<div class="lic-status warn">⏳ Periodo de prueba — ${grace.remainingDays} días restantes</div>`;
+  return `<div class="lic-status err">⛔ Sin licencia activa</div>`;
+}
+
+function setupLicense() {
+  const bar = document.getElementById('licStatusBar');
+  const activateBtn = document.getElementById('licActivateBtn');
+  const deactivateBtn = document.getElementById('licDeactivateBtn');
+  const keyInput = document.getElementById('licKeyInput');
+
+  async function refresh() {
+    const [lic, grace] = await Promise.all([gsm.license.check(), gsm.license.grace()]);
+    if (bar) bar.innerHTML = licStatusHtml(lic, grace);
+    if (keyInput && lic.key) keyInput.value = lic.key;
+  }
+
+  if (activateBtn) activateBtn.onclick = async () => {
+    const key = (keyInput && keyInput.value.trim()) || '';
+    if (!key) { term('Introduce una clave de licencia.', 'warn'); return; }
+    activateBtn.disabled = true;
+    activateBtn.textContent = 'Verificando...';
+    const r = await gsm.license.activate(key);
+    activateBtn.disabled = false;
+    activateBtn.textContent = 'Activar';
+    if (r.ok) {
+      term(`Licencia activada: ${r.plan || 'PRO'} · ${r.email || ''}`, 'ok');
+    } else {
+      term(`Error de licencia: ${r.out}`, 'err');
+    }
+    await refresh();
+  };
+
+  if (deactivateBtn) deactivateBtn.onclick = async () => {
+    if (!confirm('¿Desactivar la licencia en este equipo?')) return;
+    await gsm.license.deactivate();
+    if (keyInput) keyInput.value = '';
+    await refresh();
+    term('Licencia desactivada.', 'warn');
+  };
+
+  refresh();
+}
+
+async function checkLicenseGate() {
+  const [lic, grace] = await Promise.all([gsm.license.check(), gsm.license.grace()]);
+  if (lic.status === 'active') return; // licencia válida, ok
+
+  const modal   = document.getElementById('licModal');
+  const msgEl   = document.getElementById('licModalMsg');
+  const graceBtn = document.getElementById('licModalGrace');
+  const daysEl  = document.getElementById('licModalDays');
+  const input   = document.getElementById('licModalInput');
+  const actBtn  = document.getElementById('licModalActivate');
+
+  if (!modal) return;
+
+  if (lic.status === 'expired') {
+    if (msgEl) msgEl.innerHTML = '<div class="lic-modal-warn">Tu licencia ha expirado. Renueva para seguir usando OptiGSM PRO.</div>';
+  } else if (grace && grace.inGrace) {
+    if (msgEl) msgEl.innerHTML = `<div class="lic-modal-info">Periodo de prueba: <strong>${grace.remainingDays} días restantes</strong>.</div>`;
+    if (graceBtn) { graceBtn.style.display = ''; if (daysEl) daysEl.textContent = grace.remainingDays; }
+  } else {
+    if (msgEl) msgEl.innerHTML = '<div class="lic-modal-warn">Se requiere una licencia para usar OptiGSM.</div>';
+  }
+
+  modal.style.display = 'flex';
+
+  if (graceBtn) graceBtn.onclick = () => { modal.style.display = 'none'; };
+
+  if (actBtn) actBtn.onclick = async () => {
+    const key = (input && input.value.trim()) || '';
+    if (!key) { if (msgEl) msgEl.innerHTML += '<div class="lic-modal-err">Introduce una clave válida.</div>'; return; }
+    actBtn.disabled = true;
+    actBtn.textContent = 'Verificando...';
+    const r = await gsm.license.activate(key);
+    actBtn.disabled = false;
+    actBtn.textContent = 'Activar licencia';
+    if (r.ok) {
+      term(`Licencia activada: ${r.plan || 'PRO'}`, 'ok');
+      modal.style.display = 'none';
+      const bar = document.getElementById('licStatusBar');
+      if (bar) bar.innerHTML = licStatusHtml(r, null);
+    } else {
+      if (msgEl) msgEl.innerHTML = `<div class="lic-modal-err">❌ ${r.out}</div>`;
+    }
+  };
 }
 
 /* ===== NAV HELPER ===== */

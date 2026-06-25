@@ -16,6 +16,7 @@ const firmware = require('./firmware');
 const advanced = require('./advanced');
 const copilot = require('./copilot');
 const crm = require('./crm');
+const license = require('./license');
 
 let mainWin = null;
 
@@ -271,6 +272,53 @@ ipcMain.handle('copilot:chat', async (_, opts) => {
   });
 });
 ipcMain.handle('copilot:abort', () => { copilot.abortChat(); return { ok: true }; });
+
+/* ===== MIRROR (scrcpy) ===== */
+let _mirrorProc = null;
+function resolveScrcpy() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'tools', 'scrcpy.exe'),
+    path.join(__dirname, '..', '..', 'tools', 'scrcpy.exe'),
+    path.join(__dirname, '..', '..', 'tools', 'scrcpy'),
+    'scrcpy',
+  ];
+  return candidates.find(p => { try { return fs.existsSync(p); } catch (_) { return false; } }) || 'scrcpy';
+}
+ipcMain.handle('mirror:start', async (_, serial, opts = {}) => {
+  if (_mirrorProc && !_mirrorProc.killed) {
+    try { _mirrorProc.kill(); } catch (_) {}
+    _mirrorProc = null;
+  }
+  const bin = resolveScrcpy();
+  const args = ['--serial', serial, '--window-title', `OptiGSM Mirror — ${serial}`, '--always-on-top', '--max-fps', '30', '--max-size', '900'];
+  if (opts.noControl) args.push('--no-control');
+  if (opts.noAudio !== false) args.push('--no-audio');
+  return new Promise((resolve) => {
+    const { spawn } = require('child_process');
+    const proc = spawn(bin, args, { detached: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    _mirrorProc = proc;
+    let stderr = '';
+    proc.stderr && proc.stderr.on('data', d => { stderr += d.toString(); });
+    proc.on('error', (e) => resolve({ ok: false, out: `scrcpy no encontrado.\n\nInstala: scoop install scrcpy\nO coloca scrcpy.exe en la carpeta tools/ del proyecto.\n\n${e.message}` }));
+    setTimeout(() => {
+      if (proc.exitCode !== null && proc.exitCode !== 0) {
+        resolve({ ok: false, out: `scrcpy falló (código ${proc.exitCode}):\n${stderr.slice(0, 400)}` });
+      } else {
+        resolve({ ok: true, out: 'Espejo iniciado en ventana separada' });
+      }
+    }, 1200);
+  });
+});
+ipcMain.handle('mirror:stop', async () => {
+  if (_mirrorProc) { try { _mirrorProc.kill(); } catch (_) {} _mirrorProc = null; }
+  return { ok: true };
+});
+
+/* ===== LICENCIA ===== */
+ipcMain.handle('license:check', () => license.checkLicense());
+ipcMain.handle('license:grace', () => license.graceStatus());
+ipcMain.handle('license:activate', async (_, key) => license.activateLicense(key));
+ipcMain.handle('license:deactivate', () => license.deactivateLicense());
 
 /* ===== CRM ===== */
 ipcMain.handle('crm:clients', (_, search) => ({ ok: true, data: crm.allClients(search) }));

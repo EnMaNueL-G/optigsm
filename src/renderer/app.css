@@ -374,6 +374,33 @@ button, .btn { display: inline-flex; align-items: center; justify-content: cente
 .driver-desc { font-size: 11px; color: var(--text2); line-height: 1.4; flex: 1; }
 .driver-card .btn { margin-top: 6px; font-size: 11px; }
 
+/* ===== MIRROR BUTTON ===== */
+.action-btn-mirror { background: linear-gradient(135deg, rgba(31,111,235,.15), rgba(88,166,255,.1)); border-color: var(--accent); color: var(--accent-h); font-weight: 600; }
+.action-btn-mirror:hover { background: var(--accent); color: #fff; }
+
+/* ===== CO-PILOT PROGRESS BAR ===== */
+#cpProgress { padding: 8px 14px 6px; background: var(--bg); border-top: 1px solid var(--border); }
+.cp-prog-track { height: 3px; background: var(--bg3); border-radius: 2px; overflow: hidden; position: relative; }
+.cp-prog-slide { position: absolute; height: 100%; width: 45%; background: linear-gradient(90deg, transparent, var(--accent-h), transparent); animation: cp-slide 1.4s ease-in-out infinite; }
+@keyframes cp-slide { 0% { left: -50%; } 100% { left: 150%; } }
+.cp-prog-label { font-size: 11px; color: var(--text2); margin-top: 4px; text-align: center; }
+
+/* ===== LICENCIA ===== */
+.lic-status-bar { min-height: 28px; }
+.lic-status.ok  { background: rgba(46,160,67,.15);  color: #3fb950; border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+.lic-status.warn{ background: rgba(187,128,9,.15);  color: #d29922; border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+.lic-status.err { background: rgba(248,81,73,.15);  color: #f85149; border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+/* Modal overlay */
+.lic-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(4px); }
+.lic-modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 32px 28px; width: 430px; max-width: 96vw; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 28px 72px rgba(0,0,0,.7); }
+.lic-modal-logo { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.lic-modal-sub  { font-size: 12px; color: var(--text2); letter-spacing: .4px; }
+.lic-modal-msg  { font-size: 13px; }
+.lic-modal-warn { background: rgba(248,81,73,.12);  color: #f85149; border-radius: 6px; padding: 8px 12px; }
+.lic-modal-info { background: rgba(187,128,9,.12);  color: #d29922; border-radius: 6px; padding: 8px 12px; }
+.lic-modal-err  { background: rgba(248,81,73,.12);  color: #f85149; border-radius: 6px; padding: 6px 10px; margin-top: 6px; font-size: 12px; }
+.lic-modal-form { display: flex; flex-direction: column; gap: 10px; }
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
