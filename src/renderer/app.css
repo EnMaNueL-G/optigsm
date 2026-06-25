@@ -202,6 +202,26 @@ button, .btn { display: inline-flex; align-items: center; justify-content: cente
 .fw-files label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
 .fw-files .file-name { font-family: var(--mono); font-size: 11px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ===== SUPPORT / DONATE CARDS ===== */
+.support-card { display: flex; flex-direction: column; }
+.support-links { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.support-link { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text); transition: border-color 0.15s; }
+.support-link:hover { border-color: var(--accent); }
+.support-icon { font-size: 20px; flex-shrink: 0; }
+.support-label { font-size: 11px; color: var(--text2); }
+.support-value { font-size: 13px; color: var(--accent-h); font-weight: 500; }
+.donate-rows { display: flex; flex-direction: column; gap: 8px; }
+.donate-row { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); }
+.donate-label { font-size: 11px; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.donate-val-wrap { display: flex; align-items: center; gap: 8px; }
+.donate-val { font-family: var(--mono); font-size: 13px; color: var(--text); flex: 1; }
+.donate-val.small { font-size: 10px; word-break: break-all; }
+.donate-platforms { display: flex; gap: 8px; margin-top: 10px; }
+.donate-platform-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text); font-size: 13px; font-weight: 500; transition: border-color 0.15s, color 0.15s; }
+.donate-platform-btn:hover { border-color: var(--accent); color: var(--accent-h); }
+.fw-model-row { display: flex; gap: 6px; align-items: center; }
+.fw-model-row .input { flex: 1; }
+
 /* ===== FIRMWARE RESULT ===== */
 .fw-result { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; min-height: 40px; font-size: 13px; }
 .fw-note { padding: 6px 0; color: var(--text2); }

@@ -270,6 +270,17 @@ async function adbBatteryInfo(serial) {
     voltageStr = (parseInt(voltageRaw) / 1000).toFixed(3) + ' V';
   }
 
+  // Corriente y potencia (uevent o sys)
+  const currentUAStr = uevent['POWER_SUPPLY_CURRENT_NOW'] || '';
+  if (currentUAStr && parseInt(currentUAStr) !== 0) {
+    const mA = parseInt(currentUAStr) / 1000;
+    const sign = mA < 0 ? '' : '+';
+    result['Corriente'] = `${sign}${mA.toFixed(0)} mA`;
+    // Potencia aproximada = V × I
+    const vNum = voltageUV ? parseInt(voltageUV) / 1000000 : (voltageRaw ? parseInt(voltageRaw) / 1000 : 0);
+    if (vNum > 0) result['Potencia'] = (vNum * mA / 1000).toFixed(2) + ' W';
+  }
+
   // Samsung EFS — available only with root (non-blocking, short timeout)
   const [asocR, bsohR, cableR, daysR] = await Promise.all([
     adbShell(serial, "su -c 'cat /efs/FactoryApp/asoc 2>/dev/null'", 4000).catch(()=>({out:''})),

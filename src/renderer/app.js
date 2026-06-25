@@ -595,6 +595,30 @@ function setupHandlers() {
   };
 
   // ===== FIRMWARE =====
+  document.getElementById('fwAutoDetect').onclick = async () => {
+    const s = needDevice(); if (!s) return;
+    term('Detectando modelo del dispositivo...', 'info');
+    const [rModel, rBrand, rRegion] = await Promise.all([
+      gsm.adb.shell(s, 'getprop ro.product.model'),
+      gsm.adb.shell(s, 'getprop ro.product.brand'),
+      gsm.adb.shell(s, 'getprop ro.csc.sales_code 2>/dev/null || getprop ro.cdma.home.operator.alpha 2>/dev/null || getprop persist.sys.country 2>/dev/null'),
+    ]);
+    const model  = (rModel.out  || '').trim();
+    const brand  = (rBrand.out  || '').trim().toLowerCase();
+    const region = (rRegion.out || '').trim().toUpperCase().slice(0, 3);
+    if (model) {
+      document.getElementById('fwModel').value = model;
+      if (region && region.match(/^[A-Z]{2,3}$/)) document.getElementById('fwRegion').value = region;
+      // Auto-select brand
+      const sel = document.getElementById('fwBrand');
+      const opt = [...sel.options].find(o => brand.includes(o.value) || o.value.includes(brand));
+      if (opt) sel.value = opt.value;
+      term(`Detectado: ${model} (${brand}) región ${region || '?'}`, 'ok');
+    } else {
+      term('No se pudo detectar el modelo. Conéctate a un dispositivo.', 'warn');
+    }
+  };
+
   document.getElementById('fwSearch').onclick = async () => {
     const brand = document.getElementById('fwBrand').value;
     const model = document.getElementById('fwModel').value.trim();

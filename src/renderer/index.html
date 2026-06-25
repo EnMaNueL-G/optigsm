@@ -357,9 +357,12 @@
             <option value="huawei">Huawei</option>
             <option value="pixel">Google Pixel</option>
           </select>
-          <input class="input" id="fwModel" placeholder="Modelo (ej: SM-A546B, Redmi Note 12)">
-          <input class="input" id="fwRegion" placeholder="Región (ej: EEA, Global)">
-          <button class="btn btn-primary" id="fwSearch">Buscar firmware</button>
+          <div class="fw-model-row">
+            <input class="input" id="fwModel" placeholder="Modelo (ej: SM-A546B, Redmi Note 12)">
+            <button class="btn btn-xs" id="fwAutoDetect" title="Detectar modelo del dispositivo conectado">📱 Detectar</button>
+          </div>
+          <input class="input" id="fwRegion" placeholder="Región (ej: EEA, ZTO, Global)">
+          <button class="btn btn-primary" id="fwSearch">🔍 Buscar firmware</button>
         </div>
         <div class="fw-result" id="fwResult"></div>
         <div class="fw-actions" id="fwActions" style="display:none">
@@ -538,6 +541,67 @@
         <h2 class="panel-title">❓ Apoyo y Referencia</h2>
         <div id="supportDeviceInfo" style="margin-bottom:12px"></div>
         <div class="op-grid">
+
+          <!-- ===== CONTACTO Y SOPORTE ===== -->
+          <div class="op-card support-card">
+            <h4>Contacto y Soporte</h4>
+            <div class="support-links">
+              <a class="support-link" href="#" onclick="gsm.adb&&require('electron').shell.openExternal('https://optisuite.app');return false;">
+                <span class="support-icon">🌐</span>
+                <div>
+                  <div class="support-label">Sitio web oficial</div>
+                  <div class="support-value">optisuite.app</div>
+                </div>
+              </a>
+              <a class="support-link" href="#" onclick="gsm.adb&&require('electron').shell.openExternal('mailto:support@optisuite.app');return false;">
+                <span class="support-icon">✉️</span>
+                <div>
+                  <div class="support-label">Correo de soporte</div>
+                  <div class="support-value">support@optisuite.app</div>
+                </div>
+              </a>
+              <a class="support-link" href="#" onclick="gsm.adb&&require('electron').shell.openExternal('https://github.com/EnMaNueL-G');return false;">
+                <span class="support-icon">🐙</span>
+                <div>
+                  <div class="support-label">GitHub</div>
+                  <div class="support-value">github.com/EnMaNueL-G</div>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <!-- ===== COLABORAR / DONACION ===== -->
+          <div class="op-card support-card">
+            <h4>Colaborar / Donación</h4>
+            <p class="hint" style="margin-bottom:10px">Si OptiGSM te ahorra tiempo o dinero, puedes apoyar el desarrollo:</p>
+            <div class="donate-rows">
+              <div class="donate-row">
+                <span class="donate-label">Binance Pay ID</span>
+                <div class="donate-val-wrap">
+                  <span class="donate-val mono">1140153333</span>
+                  <button class="btn btn-xs" onclick="navigator.clipboard.writeText('1140153333');this.textContent='✓';setTimeout(()=>this.textContent='Copiar',1500)">Copiar</button>
+                </div>
+              </div>
+              <div class="donate-row">
+                <span class="donate-label">BNB BEP20 (BSC)</span>
+                <div class="donate-val-wrap">
+                  <span class="donate-val mono small">0x0a9a0d8d816ede885d1d4a5c94369a72ef86b3c1</span>
+                  <button class="btn btn-xs" onclick="navigator.clipboard.writeText('0x0a9a0d8d816ede885d1d4a5c94369a72ef86b3c1');this.textContent='✓';setTimeout(()=>this.textContent='Copiar',1500)">Copiar</button>
+                </div>
+              </div>
+            </div>
+            <div class="donate-platforms">
+              <a class="donate-platform-btn" href="#" onclick="require('electron').shell.openExternal('https://ko-fi.com/optisuite');return false;">
+                <span>☕</span> Ko-fi
+              </a>
+              <a class="donate-platform-btn" href="#" onclick="require('electron').shell.openExternal('https://liberapay.com/OptiSuite.app/donate');return false;">
+                <span>💛</span> Liberapay
+              </a>
+            </div>
+            <p class="hint" style="margin-top:8px;font-size:11px">Herramienta libre y privada — sin telemetría, sin suscripción.</p>
+          </div>
+
+          <!-- ===== DEPENDENCIAS ===== -->
           <div class="op-card">
             <h4>Instalar dependencias</h4>
             <div class="hint" style="line-height:1.9">
