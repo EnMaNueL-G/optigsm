@@ -818,6 +818,35 @@ function setupHandlers() {
   setupHwTests();
   setupCrm();
   setupAdbTerminal();
+  setupDriverButtons();
+}
+
+/* ===== DRIVERS ===== */
+function setupDriverButtons() {
+  const DRIVER_URLS = {
+    drvUniversal: 'https://adb.clockworkmod.com/',
+    drvGoogle:    'https://developer.android.com/studio/run/win-usb',
+    drvSamsung:   'https://developer.samsung.com/mobile/android-usb-driver.html',
+    drvQualcomm:  'https://developer.qualcomm.com/software/usb-drivers-for-windows',
+    drvMtk:       'https://androidmtk.com/download-mtk-usb-all-drivers',
+  };
+  Object.entries(DRIVER_URLS).forEach(([id, url]) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.onclick = () => { require('electron').shell.openExternal(url); };
+  });
+
+  const wingetBtn = document.getElementById('drvWinget');
+  if (wingetBtn) wingetBtn.onclick = async () => {
+    term('Instalando ADB via winget...', 'warn');
+    const { shell } = require('electron');
+    // Abre PowerShell con el comando winget
+    shell.openExternal('powershell:winget install --id Google.PlatformTools --accept-source-agreements --accept-package-agreements');
+    // Alternativa: copiar al portapapeles para que el usuario lo ejecute
+    navigator.clipboard.writeText('winget install --id Google.PlatformTools --accept-source-agreements --accept-package-agreements');
+    setHwtResult && setHwtResult('');
+    showResult({ ok: true, out: 'Comando copiado al portapapeles:\nwinget install --id Google.PlatformTools ...\n\nPégalo en PowerShell o CMD como Administrador.' });
+    term('Comando winget copiado al portapapeles', 'ok');
+  };
 }
 
 /* ===== APP LIST ===== */
@@ -1082,6 +1111,19 @@ function cpUpdateBubble(div, text) {
 }
 
 let _cpSending = false;
+
+async function copilotAbort() {
+  if (!_cpSending) return;
+  await gsm.copilot.abort().catch(() => {});
+  gsm.copilot.offToken();
+  _cpSending = false;
+  const sendBtn = document.getElementById('cpSend');
+  const stopBtn = document.getElementById('cpStop');
+  if (sendBtn) sendBtn.disabled = false;
+  if (stopBtn) stopBtn.style.display = 'none';
+  term('Co-Pilot: generación cancelada.', 'warn');
+}
+
 async function copilotSend() {
   if (_cpSending) return;
   const input = document.getElementById('cpInput');
@@ -1090,26 +1132,53 @@ async function copilotSend() {
   if (!text) return;
   input.value = '';
 
+  // Verificar backend antes de enviar
+  const dot = document.getElementById('cpDot');
+  if (dot && dot.className === 'cp-dot err') {
+    // Reintentar check
+    await copilotCheckBackend();
+    await copilotLoadModels();
+    const dotNow = document.getElementById('cpDot');
+    if (dotNow && dotNow.className === 'cp-dot err') {
+      cpAddMessage('system', 'Sin conexión a IA local. Abre LM Studio → carga un modelo → Start Server. O instala Ollama y ejecuta: ollama run mistral');
+      return;
+    }
+  }
+
   const sel = document.getElementById('cpModel');
   const model = sel ? sel.value : '';
   const selOpt = sel && sel.selectedOptions[0];
   const backend = selOpt ? selOpt.dataset.backend : undefined;
+  const maxTok = parseInt(document.getElementById('cpMaxTokens')?.value) || 1024;
 
   cpMessages.push({ role: 'user', content: text });
   cpAddMessage('user', text);
 
   const assistDiv = cpAddMessage('assistant', '', true);
   const sendBtn = document.getElementById('cpSend');
+  const stopBtn = document.getElementById('cpStop');
+  const tpsEl  = document.getElementById('cpTps');
   if (sendBtn) sendBtn.disabled = true;
+  if (stopBtn) stopBtn.style.display = '';
+  if (tpsEl)  tpsEl.textContent = 'Conectando...';
   _cpSending = true;
 
   let streamBuffer = '';
+  let tokenCount = 0;
+  const t0 = Date.now();
+  let tpsTimer = null;
+
   gsm.copilot.offToken();
   gsm.copilot.onToken((token) => {
     streamBuffer += token;
+    tokenCount++;
     cpUpdateBubble(assistDiv, streamBuffer);
     const msgs = document.getElementById('cpMessages');
     if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    if (tpsEl) {
+      const elapsed = (Date.now() - t0) / 1000;
+      tpsEl.textContent = `${(tokenCount / elapsed).toFixed(1)} tok/s · ${tokenCount} tokens`;
+    }
   });
 
   const r = await gsm.copilot.chat({
@@ -1117,19 +1186,26 @@ async function copilotSend() {
     model: model || undefined,
     backend: backend || undefined,
     deviceInfo: cpDeviceInfo,
+    maxTokens: maxTok,
   }).catch(e => ({ ok: false, out: e.message }));
 
   gsm.copilot.offToken();
+  clearTimeout(tpsTimer);
   _cpSending = false;
   if (sendBtn) sendBtn.disabled = false;
+  if (stopBtn) stopBtn.style.display = 'none';
+  if (tpsEl && tokenCount) {
+    const elapsed = (Date.now() - t0) / 1000;
+    tpsEl.textContent = `${(tokenCount / elapsed).toFixed(1)} tok/s · ${tokenCount} tokens · ${elapsed.toFixed(1)}s`;
+  } else if (tpsEl) tpsEl.textContent = '';
   assistDiv.classList.remove('cp-streaming');
 
-  const finalText = r.out || (r.ok ? '(sin respuesta)' : 'No se pudo conectar con el modelo. Verifica que Ollama o LM Studio esté activo y tengas un modelo cargado.');
-  cpUpdateBubble(assistDiv, streamBuffer || finalText);
+  const finalText = streamBuffer || r.out || (r.ok ? '(sin respuesta)' : 'No se pudo conectar con el modelo.\nVerifica: Ollama corriendo o LM Studio con servidor activo y modelo cargado.');
+  cpUpdateBubble(assistDiv, finalText);
   const msgs = document.getElementById('cpMessages');
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
-  if (r.ok && r.out) cpMessages.push({ role: 'assistant', content: r.out });
-  else if (!r.ok) { cpUpdateBubble(assistDiv, finalText); term('Co-Pilot error: ' + finalText, 'err'); }
+  if (r.ok || streamBuffer) cpMessages.push({ role: 'assistant', content: finalText });
+  else { term('Co-Pilot error: ' + (r.out || 'sin respuesta'), 'err'); }
 }
 
 function copilotClear() {
@@ -1296,150 +1372,208 @@ function fmtHz(v) {
 
 /* ===== TEST HARDWARE ===== */
 function setupHwTests() {
-  const COLORS = { black:'0 0 0', white:'255 255 255', red:'255 0 0', green:'0 255 0', blue:'0 0 255' };
-  document.querySelectorAll('.hwt-btn').forEach(btn => {
+  // Helper: run ADB shell con timeout garantizado + UI no bloqueada
+  async function hw(s, cmd, timeout = 5000) {
+    try { return await gsm.adb.shell(s, cmd, timeout); }
+    catch (e) { return { ok: false, out: e.message }; }
+  }
+
+  // Test de pantalla: escribe HTML de color via base64 y lo abre en el visor HTML integrado
+  const CSS_COLORS = { black:'#000', white:'#fff', red:'#f00', green:'#0f0', blue:'#00f' };
+  document.querySelectorAll('.hwt-btn[data-test^="screen-"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const s = needDevice(); if (!s) return;
-      const test = btn.dataset.test;
-      if (test === 'screen-grid') {
-        await gsm.adb.shell(s, 'am start -a android.intent.action.VIEW -t image/png 2>/dev/null');
-        term('Abriendo visor (no hay color sólido via ADB sin root)', 'warn');
-        return;
-      }
-      const color = test.replace('screen-', '');
-      const rgb = COLORS[color];
-      if (!rgb) return;
-      const r = await gsm.adb.shell(s,
-        `am start -a android.intent.action.VIEW --ez "fill" true 2>/dev/null; ` +
-        `service call SurfaceFlinger 1008 i32 1 2>/dev/null || ` +
-        `wm density 160 2>/dev/null`);
-      term(`Test pantalla ${color}: ${r.out || 'enviado'}`, 'info');
-      setHwtResult(`Test pantalla ${color} iniciado. Si no se aplica, usa una app de test de pantalla en el dispositivo.`);
+      const colorKey = btn.dataset.test.replace('screen-', '');
+      const css = CSS_COLORS[colorKey];
+      if (!css) return;
+      const textClr = ['black','blue','green'].includes(colorKey) ? '#fff' : '#000';
+      const html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0}html,body{width:100%;height:100vh;background:${css};overflow:hidden;display:flex;align-items:flex-end;justify-content:center}p{color:${textClr};font:16px/3 sans-serif;text-shadow:0 1px 3px rgba(0,0,0,.4)}</style></head><body><p>OptiGSM — ${colorKey.toUpperCase()}</p></body></html>`;
+      // btoa disponible en renderer Electron (contexto Chromium)
+      const b64 = btoa(html);
+      setHwtResult(`Enviando test pantalla ${colorKey.toUpperCase()}...`);
+      // Escribe el archivo y lo abre con el visor HTML nativo de Android
+      const r = await hw(s,
+        `echo '${b64}' | base64 -d > /sdcard/Download/optigsm_screen.html 2>/dev/null && ` +
+        `am start -n com.android.htmlviewer/.HTMLViewerActivity -d file:///sdcard/Download/optigsm_screen.html 2>/dev/null || ` +
+        `am start -a android.intent.action.VIEW -d file:///sdcard/Download/optigsm_screen.html 2>/dev/null`, 6000);
+      setHwtResult(r.ok !== false
+        ? `Pantalla ${colorKey.toUpperCase()} abierta en el dispositivo.\nSi no aparece: abre /sdcard/Download/optigsm_screen.html manualmente.`
+        : `Error: ${r.out}`);
     });
   });
 
   document.getElementById('hwtPixelTest').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    await gsm.adb.shell(s, 'am start -n com.android.settings/.SubSettings 2>/dev/null');
-    const r = await gsm.adb.shell(s, 'dumpsys display 2>/dev/null | head -30');
-    setHwtResult('Test de píxeles: Usa la app "Bad Pixels" instalada en el dispositivo.\n\n' + (r.out || ''));
-    term('Iniciando test píxeles', 'info');
+    setHwtResult('Detectando marca...');
+    const brand = (await hw(s, 'getprop ro.product.brand', 3000)).out.trim().toLowerCase();
+    if (brand.includes('samsung')) {
+      // Samsung: abre el menú de diagnóstico de fábrica
+      await hw(s, 'am start -a android.intent.action.DIAL -d "tel:%2A%230%2A%23" 2>/dev/null', 4000);
+      setHwtResult('Samsung: Menú diagnóstico *#0*# abierto.\nSelecciona "Display" → LCD test para test de píxeles y colores completo.');
+      return;
+    }
+    // Universal: empuja pantallas de colores blanco/negro/rojo para inspección visual
+    const dsp = (await hw(s, 'wm size 2>/dev/null && wm density 2>/dev/null && dumpsys display 2>/dev/null | grep -E "mDisplayId|DisplayWidth|DisplayHeight|refreshRate|density" | head -8', 4000)).out;
+    setHwtResult(`Info pantalla:\n${dsp}\n\nTest de píxeles: Se abrirá pantalla en BLANCO (inspecciona píxeles muertos oscuros).`);
+    const htmlW = btoa(`<!DOCTYPE html><html><style>*{margin:0}body{background:#fff;width:100%;height:100vh}</style></html>`);
+    await hw(s, `echo '${htmlW}' | base64 -d > /sdcard/Download/optigsm_white.html 2>/dev/null && am start -n com.android.htmlviewer/.HTMLViewerActivity -d file:///sdcard/Download/optigsm_white.html 2>/dev/null || am start -a android.intent.action.VIEW -d file:///sdcard/Download/optigsm_white.html 2>/dev/null`, 5000);
   };
 
   document.getElementById('hwtTouchTest').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    await gsm.adb.shell(s, 'am start -a android.intent.action.VIEW -d "mobileservice://touchtest" 2>/dev/null || am start -n com.android.settings/.TouchTestActivity 2>/dev/null');
-    term('Abriendo test touch...', 'info');
+    // Inicia monitor de eventos de touch en background + abre Settings
+    term('Touch: monitorea eventos con logcat. Toca la pantalla y observa.', 'info');
+    await hw(s, 'am start -a android.settings.SETTINGS 2>/dev/null', 3000);
+    setHwtResult('Para verificar el táctil:\n• Desliza/toca el dispositivo\n• En Terminal ADB → Logcat filtra por tag "InputReader" para ver eventos de touch en tiempo real\n• O usa getevent -l en el shell (Avanzado)');
   };
 
   document.getElementById('hwtTouchInfo').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    const r = await gsm.adb.shell(s, 'cat /proc/bus/input/devices 2>/dev/null | grep -A5 -i touch | head -30');
-    setHwtResult(r.out || 'No se pudo leer info touch');
+    const r = await hw(s, 'cat /proc/bus/input/devices 2>/dev/null | grep -A8 -iE "touch|ft5|synaptics|goodix|atmel|focaltech|himax|novatek" | head -50', 6000);
+    setHwtResult(r.out || 'No se encontró driver táctil en /proc/bus/input/devices\nPrueba: ls /sys/bus/i2c/devices/ en el shell');
   };
 
   document.getElementById('hwtSensors').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    term('Leyendo sensores...', 'info');
-    const r = await gsm.adb.shell(s, 'dumpsys sensorservice 2>/dev/null | grep -E "^[0-9]|Sensor|Type|handle" | head -60');
-    document.getElementById('hwtSensorOut').textContent = r.out || 'Sin datos de sensores';
+    setHwtResult('Leyendo sensores (puede tardar 5s)...');
+    const r = await hw(s, 'dumpsys sensorservice 2>/dev/null | grep -E "name=|type=|vendor=|resolution=|maxRange=|power=" | head -80', 8000);
+    document.getElementById('hwtSensorOut').textContent = r.out || 'Sin datos. Puede requerir privilegios elevados.';
+    setHwtResult(r.out ? `${(r.out.match(/name=/g)||[]).length} sensores encontrados.` : 'Sin datos de sensores.');
   };
 
   document.getElementById('hwtSpeaker').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    await gsm.adb.shell(s, 'media volume --set 8 --stream 3 2>/dev/null');
-    const r = await gsm.adb.shell(s, 'am start -a android.intent.action.VIEW -t audio/wav 2>/dev/null || tinymix 2>/dev/null | head -5');
-    setHwtResult('Test altavoz: Se subió el volumen al máximo.\nUsando el tono de prueba del sistema.\n' + (r.out||''));
+    // Volumen al máximo + reproduce tono del sistema
+    await hw(s, 'media volume --set 15 --stream 3 2>/dev/null || settings put system volume_music_speaker 15 2>/dev/null', 3000);
+    const r = await hw(s, 'am start -a android.intent.action.MAIN -n com.android.settings/.SoundSettings 2>/dev/null', 3000);
+    setHwtResult('Volumen al máximo.\nAbre Ajustes → Sonido en el dispositivo para reproducir un tono de prueba del altavoz.\n' + (r.out || ''));
+    term('Altavoz: volumen subido al máximo', 'ok');
   };
 
   document.getElementById('hwtMic').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    const r = await gsm.adb.shell(s, 'dumpsys media.audio_policy 2>/dev/null | grep -i "mic\|input" | head -20');
-    setHwtResult(r.out || 'Sin info de micrófono (puede requerir root)');
+    const r = await hw(s, 'dumpsys media.audio_flinger 2>/dev/null | grep -iE "record|input|mic|capture|active" | head -20', 6000);
+    setHwtResult(r.out
+      ? r.out
+      : 'Abre la app de Grabadora del sistema → graba 3 segundos → reproduce para verificar el micrófono.');
   };
 
   document.getElementById('hwtEarpiece').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    await gsm.adb.shell(s, 'media volume --set 15 --stream 0 2>/dev/null');
-    setHwtResult('Volumen auricular al máximo. Realiza una llamada de prueba para verificar.');
+    await hw(s, 'media volume --set 15 --stream 0 2>/dev/null', 3000);
+    setHwtResult('Volumen de auricular al máximo.\nRealiza una llamada de prueba o usa la app de Grabadora para verificar el auricular.');
   };
 
   document.getElementById('hwtCamBack').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    await gsm.adb.shell(s, 'am start -a android.media.action.IMAGE_CAPTURE 2>/dev/null');
+    const r = await hw(s,
+      'am start -a android.media.action.IMAGE_CAPTURE 2>/dev/null || ' +
+      'am start -a android.media.action.STILL_IMAGE_CAMERA 2>/dev/null', 4000);
+    setHwtResult(`Cámara trasera: ${r.ok !== false ? 'abierta en el dispositivo' : r.out}`);
     term('Cámara trasera abierta', 'info');
   };
 
   document.getElementById('hwtCamFront').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    await gsm.adb.shell(s, 'am start -a android.media.action.IMAGE_CAPTURE --ei android.intent.extras.CAMERA_FACING 1 2>/dev/null');
+    const r = await hw(s,
+      'am start -a android.media.action.IMAGE_CAPTURE --ei android.intent.extras.CAMERA_FACING 1 2>/dev/null || ' +
+      'am start -a android.media.action.SELFIE_STILL_IMAGE_CAMERA 2>/dev/null', 4000);
+    setHwtResult(`Cámara frontal: ${r.ok !== false ? 'abierta en el dispositivo' : r.out}`);
     term('Cámara frontal abierta', 'info');
   };
 
   document.getElementById('hwtCamInfo').onclick = async () => {
     const s = needDevice(); if (!s) return;
-    const r = await gsm.adb.shell(s, 'dumpsys media.camera 2>/dev/null | grep -E "camera id|facing|resolution|support" | head -30');
-    setHwtResult(r.out || 'Sin info de cámaras');
+    const r = await hw(s,
+      'dumpsys media.camera 2>/dev/null | grep -iE "camera|facing|resolution|capability|logical|physical" | head -40 || ' +
+      'getprop | grep -i camera | head -20', 7000);
+    setHwtResult(r.out || 'Sin info de cámaras vía ADB.');
   };
 
-  document.getElementById('hwtVib1').onclick = async () => { const s=needDevice();if(!s)return; await gsm.adb.shell(s,'cmd vibrator vibrate 200 test 2>/dev/null || input keyevent 0 2>/dev/null'); };
-  document.getElementById('hwtVib2').onclick = async () => { const s=needDevice();if(!s)return; await gsm.adb.shell(s,'cmd vibrator vibrate 1000 test 2>/dev/null'); };
+  document.getElementById('hwtVib1').onclick = async () => {
+    const s = needDevice(); if (!s) return;
+    const r = await hw(s, 'cmd vibrator vibrate 300 test 2>/dev/null || ' +
+      'service call vibrator 1 i32 300 2>/dev/null', 3000);
+    setHwtResult(`Vibración 300ms: ${r.out || 'enviado'}`);
+  };
+  document.getElementById('hwtVib2').onclick = async () => {
+    const s = needDevice(); if (!s) return;
+    const r = await hw(s, 'cmd vibrator vibrate 1000 test 2>/dev/null', 3000);
+    setHwtResult(`Vibración 1s: ${r.out || 'enviado'}`);
+  };
   document.getElementById('hwtVib3').onclick = async () => {
-    const s=needDevice();if(!s)return;
-    // SOS pattern: 3 short, 3 long, 3 short
-    for (const d of [200,200,200,600,600,600,200,200,200]) {
-      await gsm.adb.shell(s,`cmd vibrator vibrate ${d} test 2>/dev/null`);
-      await new Promise(r=>setTimeout(r,d+100));
+    const s = needDevice(); if (!s) return;
+    setHwtResult('Patrón SOS: 3×corta, 3×larga, 3×corta...');
+    for (const [dur, label] of [[250,'S'],[250,'S'],[250,'S'],[750,'O'],[750,'O'],[750,'O'],[250,'S'],[250,'S'],[250,'S']]) {
+      await hw(s, `cmd vibrator vibrate ${dur} test 2>/dev/null`, dur + 300);
+      setHwtResult(`SOS → ${label} (${dur}ms)`);
     }
+    setHwtResult('Patrón SOS completado.\nSi no hubo vibración: motor posiblemente dañado o comando no soportado en este Android.');
   };
 
   document.getElementById('hwtWifi').onclick = async () => {
-    const s=needDevice();if(!s)return;
-    const r = await gsm.adb.shell(s,'dumpsys wifi 2>/dev/null | grep -E "mWifiInfo|SSID|frequency|link speed|RSSI" | head -10');
-    setHwtResult(r.out || 'Sin info WiFi');
+    const s = needDevice(); if (!s) return;
+    const r = await hw(s,
+      'dumpsys wifi 2>/dev/null | grep -E "SSID|BSSID|freq|linkSpeed|rssi|score|IP" | head -12 && ' +
+      'ip addr show wlan0 2>/dev/null | grep -E "inet |link" | head -4', 6000);
+    setHwtResult(r.out || 'Sin info WiFi (verifica que WiFi esté activo en el dispositivo)');
   };
 
   document.getElementById('hwtBt').onclick = async () => {
-    const s=needDevice();if(!s)return;
-    const r = await gsm.adb.shell(s,'dumpsys bluetooth_manager 2>/dev/null | grep -E "state|address|name" | head -10');
+    const s = needDevice(); if (!s) return;
+    const r = await hw(s,
+      'dumpsys bluetooth_manager 2>/dev/null | grep -iE "enabled|address|name|state|version|bonded" | head -15', 6000);
     setHwtResult(r.out || 'Sin info Bluetooth');
   };
 
   document.getElementById('hwtUsb').onclick = async () => {
-    const s=needDevice();if(!s)return;
-    const r = await gsm.adb.shell(s,'cat /sys/class/power_supply/usb/type 2>/dev/null; getprop sys.usb.config 2>/dev/null; dumpsys usb 2>/dev/null | grep -E "function|state|otg" | head -10');
+    const s = needDevice(); if (!s) return;
+    const r = await hw(s,
+      'echo "=== Config USB ===" && getprop sys.usb.config 2>/dev/null && getprop sys.usb.state 2>/dev/null && ' +
+      'echo "=== Alimentación ===" && cat /sys/class/power_supply/usb/type 2>/dev/null && cat /sys/class/power_supply/usb/online 2>/dev/null && ' +
+      'echo "=== Carga ===" && cat /sys/class/power_supply/battery/current_now 2>/dev/null && ' +
+      'echo "=== OTG ===" && dumpsys usb 2>/dev/null | grep -iE "otg|host|device|connected" | head -6', 6000);
     setHwtResult(r.out || 'Sin info USB');
   };
 
   document.getElementById('hwtBatteryApps').onclick = async () => {
-    const s=needDevice();if(!s)return;
-    term('Analizando consumo por apps...','info');
-    const r = await gsm.adb.shell(s,'dumpsys batterystats --charged 2>/dev/null | grep -E "^    [0-9]|Uid|mAh" | head -40',15000);
-    document.getElementById('hwtBatteryOut').textContent = r.out || 'Sin datos (puede requerir root o resetear estadísticas)';
+    const s = needDevice(); if (!s) return;
+    setHwtResult('Analizando consumo de batería (10-15s)...');
+    const r = await hw(s,
+      'dumpsys batterystats 2>/dev/null | grep -E "Uid u0a|Screen|Wifi|Idle|Foreground" | head -50', 18000);
+    document.getElementById('hwtBatteryOut').textContent = r.out ||
+      'Sin datos.\nTip: "adb shell dumpsys batterystats --reset" para reiniciar\ny luego usa el dispositivo 10 min antes de volver a medir.';
+    setHwtResult(r.out ? 'Consumo analizado.' : 'Sin datos de consumo.');
   };
 
   document.getElementById('hwtScreenshot').onclick = async () => {
-    const s=needDevice();if(!s)return;
+    const s = needDevice(); if (!s) return;
+    setHwtResult('Capturando screenshot...');
     const r = await gsm.adb.screenshot(s);
     if (r.ok && r.path) {
-      showResult({ ok: true, out: `Screenshot guardado: ${r.path}` });
+      setHwtResult(`Screenshot guardado:\n${r.path}`);
       const modal = document.getElementById('ssModal');
       const img   = document.getElementById('ssImg');
       if (modal && img) { img.src = 'file://' + r.path; modal.style.display = 'flex'; }
-    } else showResult(r);
+    } else {
+      setHwtResult('Error screenshot: ' + (r.out || 'desconocido'));
+    }
   };
 
   document.getElementById('hwtScreencast').onclick = async () => {
-    const s=needDevice();if(!s)return;
-    const sec = parseInt(document.getElementById('hwtRecordSec').value)||10;
-    const dest = await gsm.saveFile({ defaultPath: `screencast_${Date.now()}.mp4`, filters:[{name:'Video',extensions:['mp4']}] });
+    const s = needDevice(); if (!s) return;
+    const sec = parseInt(document.getElementById('hwtRecordSec').value) || 10;
+    const dest = await gsm.saveFile({ defaultPath: `screencast_${Date.now()}.mp4`, filters: [{name:'Video',extensions:['mp4']}] });
     if (!dest) return;
-    term(`Grabando pantalla ${sec}s...`, 'warn');
-    const r = await gsm.adb.shell(s, `screenrecord --time-limit ${sec} /sdcard/sc_tmp.mp4 2>/dev/null`, (sec+5)*1000);
-    if (r.ok) {
-      await gsm.adb.shell(s, `mv /sdcard/sc_tmp.mp4 /sdcard/screencast.mp4 2>/dev/null`);
-      setHwtResult(`Grabación completada. Descarga desde /sdcard/screencast.mp4`);
-    } else setHwtResult('Error: ' + r.out);
+    setHwtResult(`Grabando pantalla ${sec}s... No toques el botón.`);
+    term(`Screencast iniciado (${sec}s)`, 'warn');
+    const r = await hw(s, `screenrecord --time-limit ${sec} /sdcard/Download/optigsm_sc.mp4 2>/dev/null`, (sec + 15) * 1000);
+    if (r.ok !== false) {
+      setHwtResult(`Grabación completada (${sec}s).\nDescarga con adb:\nadb pull /sdcard/Download/optigsm_sc.mp4 "${dest}"`);
+      term('Screencast completado', 'ok');
+    } else {
+      setHwtResult('Error screencast: ' + (r.out || 'screenrecord no disponible en este dispositivo'));
+    }
   };
 }
 
@@ -1611,16 +1745,138 @@ let _logcatRunning = false;
 function setupAdbTerminal() {
   const output = document.getElementById('shellOutput');
   const input  = document.getElementById('shellInput');
-  const SUGGESTIONS = ['getprop ro.product.model','dumpsys battery','pm list packages -3',
-    'dumpsys sensorservice','logcat -d -t 50','df -h','ls /sdcard/',
-    'settings list global','wm size','wm density','su -c id','getprop ro.build.version.release'];
+  const CMD_CATS = {
+    'Info dispositivo': [
+      'getprop ro.product.model',
+      'getprop ro.product.brand',
+      'getprop ro.build.version.release',
+      'getprop ro.build.fingerprint',
+      'getprop ro.product.cpu.abi',
+      'getprop ro.boot.verifiedbootstate',
+      'getprop ro.boot.verificationbootstate',
+      'getprop sys.oem_unlock_allowed',
+      'wm size',
+      'wm density',
+      'cat /proc/cpuinfo | head -20',
+      'cat /proc/meminfo | head -10',
+    ],
+    'Batería / Carga': [
+      'dumpsys battery',
+      'cat /sys/class/power_supply/battery/capacity',
+      'cat /sys/class/power_supply/battery/status',
+      'cat /sys/class/power_supply/battery/voltage_now',
+      'cat /sys/class/power_supply/battery/current_now',
+      'cat /sys/class/power_supply/battery/temp',
+      'cat /sys/class/power_supply/battery/health',
+      'cat /sys/class/power_supply/battery/cycle_count',
+      'dumpsys batterystats --reset',
+    ],
+    'Apps / Paquetes': [
+      'pm list packages -3',
+      'pm list packages -s',
+      'pm list packages -d',
+      'pm list packages | wc -l',
+      'pm disable-user --user 0 com.ejemplo.app',
+      'pm enable com.ejemplo.app',
+      'am force-stop com.ejemplo.app',
+      'am clear com.ejemplo.app',
+      'dumpsys package com.ejemplo.app | head -30',
+      'cmd package list-packages --show-versioncode -3',
+    ],
+    'Red / WiFi / BT': [
+      'dumpsys wifi | grep -E "SSID|rssi|freq|linkSpeed"',
+      'ip addr show wlan0',
+      'ip route',
+      'netstat -tnp 2>/dev/null | head -20',
+      'cat /proc/net/if_inet6',
+      'svc wifi enable',
+      'svc wifi disable',
+      'svc bluetooth enable',
+      'svc bluetooth disable',
+      'settings get global wifi_on',
+      'settings put global wifi_on 1',
+      'settings put global airplane_mode_on 1; am broadcast -a android.intent.action.AIRPLANE_MODE',
+    ],
+    'Almacenamiento': [
+      'df -h',
+      'df -h /sdcard',
+      'ls /sdcard/ -la',
+      'ls /storage/ -la',
+      'du -sh /sdcard/* 2>/dev/null | sort -rh | head -10',
+      'stat /sdcard',
+      'cat /proc/partitions',
+      'ls -la /dev/block/by-name/ 2>/dev/null | head -30',
+    ],
+    'Display / Input': [
+      'dumpsys display | grep -E "mDisplayId|mWidth|mHeight|refreshRate|density" | head -10',
+      'dumpsys input | grep -E "device|touch|source" | head -20',
+      'cat /proc/bus/input/devices | head -40',
+      'getevent -l 2>/dev/null | head -20',
+      'input keyevent 26',
+      'input keyevent 82',
+      'input tap 540 960',
+      'input swipe 540 1500 540 500 300',
+      'input text "OptiGSM"',
+      'screencap -p /sdcard/Download/cap.png && echo OK',
+    ],
+    'Procesos / Sistema': [
+      'ps -A | grep -i system | head -20',
+      'top -n 1 -b | head -20',
+      'cat /proc/loadavg',
+      'uptime',
+      'dmesg | tail -30',
+      'logcat -d -t 50 -b all',
+      'logcat -d -t 30 *:E',
+      'logcat -d -t 20 -s AndroidRuntime:E',
+      'getprop | grep -i debug',
+      'settings list global | grep develop',
+    ],
+    'Seguridad / Knox': [
+      'getprop ro.boot.verifiedbootstate',
+      'getprop ro.secure',
+      'getprop ro.debuggable',
+      'getprop ro.boot.flash.locked',
+      'getprop ril.serialnumber',
+      'getprop ro.product.serial',
+      'settings get global development_settings_enabled',
+      'dumpsys device_policy | grep -i "admin\|encrypt\|lock" | head -15',
+    ],
+    'TV Box / Android TV': [
+      'getprop ro.product.type',
+      'getprop ro.build.characteristics',
+      'pm list features | grep -i tv',
+      'pm list features | grep -i leanback',
+      'am start -n com.android.launcher/com.android.launcher.Launcher 2>/dev/null',
+      'settings put secure enabled_input_methods com.google.android.gms/.ads.identifier.service.AdvertisingIdService',
+      'pm disable-user --user 0 com.amazon.ftv.remoteservice 2>/dev/null',
+      'wm density 160',
+      'wm density reset',
+      'wm size 1920x1080',
+      'wm size reset',
+    ],
+  };
 
-  // Autocompletado básico
-  document.getElementById('shellSuggest').innerHTML = SUGGESTIONS.slice(0,6).map(s =>
-    `<span class="shell-hint">${escHtml(s)}</span>`).join('');
-  document.querySelectorAll('.shell-hint').forEach(h => {
-    h.onclick = () => { input.value = h.textContent; input.focus(); };
-  });
+  const SUGGESTIONS = Object.values(CMD_CATS).flat();
+
+  // Comandos por categoría con dropdown
+  const suggestEl = document.getElementById('shellSuggest');
+  const catNames = Object.keys(CMD_CATS);
+  let activeCat = catNames[0];
+
+  function renderSuggest() {
+    suggestEl.innerHTML =
+      catNames.map(c => `<span class="shell-cat-btn${c===activeCat?' active':''}" data-cat="${escHtml(c)}">${escHtml(c)}</span>`).join('') +
+      '<div class="shell-hints-row" id="shellHintsRow">' +
+      CMD_CATS[activeCat].map(s => `<span class="shell-hint">${escHtml(s)}</span>`).join('') +
+      '</div>';
+    suggestEl.querySelectorAll('.shell-cat-btn').forEach(b => {
+      b.onclick = () => { activeCat = b.dataset.cat; renderSuggest(); };
+    });
+    suggestEl.querySelectorAll('.shell-hint').forEach(h => {
+      h.onclick = () => { input.value = h.textContent; input.focus(); };
+    });
+  }
+  renderSuggest();
 
   input.addEventListener('keydown', async (e) => {
     if (e.key === 'ArrowUp') {

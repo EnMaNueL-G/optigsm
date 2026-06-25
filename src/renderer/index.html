@@ -535,7 +535,15 @@
             </div>
             <div class="cp-composer">
               <textarea class="cp-input" id="cpInput" placeholder="Escribe tu pregunta de reparación..." rows="2"></textarea>
-              <button class="btn btn-primary cp-send" id="cpSend">Enviar ↵</button>
+              <div class="cp-composer-actions">
+                <button class="btn btn-primary cp-send" id="cpSend">Enviar ↵</button>
+                <button class="btn btn-danger cp-send" id="cpStop" style="display:none" onclick="copilotAbort()">⏹ Detener</button>
+                <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
+                  <label style="font-size:11px;color:var(--text2)">Max tokens:</label>
+                  <input class="input" id="cpMaxTokens" type="number" value="1024" min="128" max="4096" step="128" style="width:72px;font-size:11px">
+                </div>
+                <span id="cpTps" style="font-size:10px;color:var(--text2);margin-top:4px"></span>
+              </div>
             </div>
           </div>
         </div>
@@ -590,6 +598,43 @@
           </div>
           <button class="btn" id="depCheck">Verificar dependencias</button>
           <div class="hint">Instala con: pip install mtkclient edlclient | scoop install heimdall adb</div>
+        </div>
+        <div class="settings-group">
+          <h3>Drivers USB — Instalar / Descargar</h3>
+          <p class="hint" style="margin-bottom:8px">Drivers necesarios para que Windows reconozca cualquier dispositivo Android, tablet o TV Box por USB.</p>
+          <div class="driver-grid">
+            <div class="driver-card">
+              <div class="driver-name">Universal ADB Driver</div>
+              <div class="driver-desc">Funciona con TODOS los Android: teléfonos, tablets, TV Box. El más completo.</div>
+              <button class="btn btn-primary btn-sm" id="drvUniversal">Descargar (ClockworkMod)</button>
+            </div>
+            <div class="driver-card">
+              <div class="driver-name">Google USB Driver</div>
+              <div class="driver-desc">Oficial Google — Pixel, Nexus, Android One. También incluye ADB.</div>
+              <button class="btn btn-sm" id="drvGoogle">Descargar (Android SDK)</button>
+            </div>
+            <div class="driver-card">
+              <div class="driver-name">Samsung USB Driver</div>
+              <div class="driver-desc">Para todos los Samsung: Galaxy S/A/M/Tab. Necesario para Odin/Heimdall.</div>
+              <button class="btn btn-sm" id="drvSamsung">Descargar (Samsung)</button>
+            </div>
+            <div class="driver-card">
+              <div class="driver-name">Qualcomm HS-USB</div>
+              <div class="driver-desc">Driver QHSUSB para modo EDL (9008). Xiaomi, OnePlus, Motorola QC.</div>
+              <button class="btn btn-sm" id="drvQualcomm">Descargar (Qualcomm)</button>
+            </div>
+            <div class="driver-card">
+              <div class="driver-name">MTK VCOM Driver</div>
+              <div class="driver-desc">MediaTek preloader / BROM mode. Necesario para mtkclient.</div>
+              <button class="btn btn-sm" id="drvMtk">Descargar (MTK)</button>
+            </div>
+            <div class="driver-card">
+              <div class="driver-name">Instalar via winget</div>
+              <div class="driver-desc">Instala ADB + platform-tools oficiales de Google en segundos.</div>
+              <button class="btn btn-sm" id="drvWinget">Instalar ADB (winget)</button>
+            </div>
+          </div>
+          <div class="hint" style="margin-top:8px">Después de instalar drivers, desconecta y reconecta el dispositivo. Activa "Depuración USB" en Opciones de desarrollador.</div>
         </div>
         <div class="btn-row">
           <button class="btn btn-primary" id="saveSettings">Guardar ajustes</button>
@@ -701,12 +746,33 @@
             </div>
           </div>
           <div class="op-card">
-            <h4>Heimdall no detectado</h4>
+            <h4>Heimdall — cómo incorporarlo</h4>
             <div class="hint" style="line-height:1.9">
-              Heimdall es una herramienta open-source para Samsung.<br>
-              <strong>Instalar:</strong> <code>scoop install heimdall</code><br>
-              O descarga el binario en <em>heimdall.wiki.kernel.org</em> y agrégalo al PATH.<br>
-              Luego en Ajustes → verifica dependencias.
+              Heimdall es open-source (MIT) y se puede incrustar sin instalación externa.<br>
+              <strong>Opción 1 (recomendada):</strong> Descarga <code>heimdall.exe</code> y colócalo en la carpeta <code>tools/</code> del proyecto — OptiGSM lo detectará automáticamente.<br>
+              <strong>Opción 2:</strong> <code>scoop install heimdall</code> o <code>winget install Heimdall</code><br>
+              <strong>Opción 3:</strong> Configura la ruta en Ajustes → Rutas de herramientas.<br>
+              <a href="#" style="color:var(--accent-h)" onclick="require('electron').shell.openExternal('https://github.com/BenjaminDobell/Heimdall/releases');return false;">Descargar releases de Heimdall →</a>
+            </div>
+          </div>
+          <div class="op-card">
+            <h4>📺 TV Box Android — compatibilidad</h4>
+            <div class="hint" style="line-height:1.9">
+              <strong>¿Funciona OptiGSM con TV Box?</strong> Sí. Los TV Box corren Android y son 100% compatibles con ADB.<br><br>
+              <strong>Conectar via WiFi (más común en TV Box):</strong><br>
+              1. En el TV Box: Ajustes → Opciones de desarrollador → Depuración ADB por red: ON<br>
+              2. Anota la IP del TV Box (Ajustes → Red)<br>
+              3. En OptiGSM → Inicio → "Conectar WiFi" → escribe la IP<br>
+              4. O en Terminal ADB: <code>adb connect 192.168.1.X:5555</code><br><br>
+              <strong>Qué puedes hacer con un TV Box:</strong><br>
+              • Instalar/desinstalar APKs (launcher, apps)<br>
+              • Deshabilitar bloatware del fabricante<br>
+              • Cambiar la densidad de pantalla (<code>wm density</code>)<br>
+              • Instalar launchers alternativos (Wolf Launcher, ATV, etc.)<br>
+              • Flash firmware via Fastboot (si el dispositivo lo soporta)<br>
+              • Root via Magisk si el bootloader está desbloqueado<br>
+              • Leer y exportar logs del sistema<br><br>
+              <strong>Nota:</strong> El Terminal ADB → categoría "TV Box / Android TV" incluye comandos específicos para estos dispositivos.
             </div>
           </div>
           <div class="op-card">

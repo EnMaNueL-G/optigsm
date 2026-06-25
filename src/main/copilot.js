@@ -27,10 +27,17 @@ function httpPost(url, body, onChunk, timeout = 120000) {
       });
       res.on('end', () => resolve({ ok: res.statusCode < 400, status: res.statusCode, data: full }));
     });
-    req.on('error', reject);
+    req.on('error', (e) => {
+      if (e.code === 'ECONNRESET' || e.message === 'socket hang up') {
+        resolve({ ok: true, status: 200, data: '' }); // aborted by user
+      } else {
+        reject(e);
+      }
+    });
     req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
     req.write(data);
     req.end();
+    _currentReq = req;
   });
 }
 
@@ -111,8 +118,14 @@ REGLAS:
 - Sé honesto: si no sabes algo, dilo. No inventes métodos que no existen.
 - Cuando des comandos ADB o shell, ponlos en bloques de código.`;
 
+// ── Abort del chat en curso ─────────────────────────────────────────────────
+let _currentReq = null;
+function abortChat() {
+  if (_currentReq) { try { _currentReq.destroy(); } catch (_) {} _currentReq = null; }
+}
+
 // ── Chat principal ──────────────────────────────────────────────────────────
-async function chat({ messages, model, deviceInfo, backend }, onChunk) {
+async function chat({ messages, model, deviceInfo, backend, maxTokens }, onChunk) {
   const ctx = buildDeviceContext(deviceInfo);
   const systemMsg = SYSTEM_PROMPT + (ctx && ctx !== 'No hay dispositivo conectado.'
     ? `\n\nDISPOSITIVO ACTUALMENTE CONECTADO:\n${ctx}`
@@ -166,7 +179,7 @@ async function chat({ messages, model, deviceInfo, backend }, onChunk) {
         messages: fullMessages,
         stream: true,
         temperature: 0.7,
-        max_tokens: 2048,
+        max_tokens: maxTokens || 1024,
       }, collectChunk, 180000);
       if (!r.ok && !fullText) return { ok: false, out: `LM Studio error ${r.status}: ${r.data.slice(0, 300)}` };
     }
@@ -188,4 +201,4 @@ const QUICK_PROMPTS = [
   { id: 'drm', label: '🎬 Widevine L1', prompt: '¿Cómo verifico o recupero la certificación Widevine L1 en este dispositivo?' },
 ];
 
-module.exports = { detectBackends, listModels, buildDeviceContext, chat, QUICK_PROMPTS };
+module.exports = { detectBackends, listModels, buildDeviceContext, chat, abortChat, QUICK_PROMPTS };

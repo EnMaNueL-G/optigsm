@@ -12,15 +12,26 @@ let HEIMDALL = 'heimdall';
 
 function setHeimdall(p) { if (p && fs.existsSync(p)) HEIMDALL = p; }
 
+function resolveHeimdall() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'tools', 'heimdall.exe'),
+    path.join(__dirname, '..', '..', 'tools', 'heimdall.exe'),
+    path.join(__dirname, '..', '..', 'tools', 'heimdall'),
+    HEIMDALL,
+  ];
+  return candidates.find(p => { try { return fs.existsSync(p); } catch (_) { return false; } }) || HEIMDALL;
+}
+
 function runHeimdall(args, onData) {
   return new Promise((resolve) => {
-    const proc = spawn(HEIMDALL, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const bin = resolveHeimdall();
+    const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     const handler = (d) => { const s = d.toString(); out += s; if (onData) onData(s); };
     proc.stdout.on('data', handler);
     proc.stderr.on('data', handler);
     proc.on('close', (code) => resolve({ ok: code === 0, out: out.trim() }));
-    proc.on('error', (e) => resolve({ ok: false, out: 'Heimdall no encontrado. Instala desde: https://heimdall.wiki.kernel.org\n' + e.message }));
+    proc.on('error', () => resolve({ ok: false, out: `Heimdall no encontrado.\nOpciones:\n1. Coloca heimdall.exe en la carpeta tools/ del proyecto\n2. Instala: scoop install heimdall\n3. Configura la ruta en Ajustes → Rutas de herramientas` }));
   });
 }
 

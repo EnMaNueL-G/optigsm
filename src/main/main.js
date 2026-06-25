@@ -270,6 +270,7 @@ ipcMain.handle('copilot:chat', async (_, opts) => {
     if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('copilot:token', token);
   });
 });
+ipcMain.handle('copilot:abort', () => { copilot.abortChat(); return { ok: true }; });
 
 /* ===== CRM ===== */
 ipcMain.handle('crm:clients', (_, search) => ({ ok: true, data: crm.allClients(search) }));
